@@ -7,18 +7,26 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 
 /**
- * Ultimate Mortgage Calculator — Fresh Recode (Sep 7, 2025)
+ * Ultimate Mortgage Calculator — FULL RECODE (Sep 7, 2025)
  *
- * FULL RECODE (per user instruction)
+ * Indigo-forward, dark-mode-only UI. This is a fresh file (not an edit of your previous canvas).
  *
- * Update in this build:
- * - The output no longer shows a Funding Fee line for **Conventional** loans (not even $0).
- * - FHA still shows UFMIP when applicable; VA/IRRRL still show Funding Fee when > $0 or not exempt.
+ * Changes per request:
+ * - Input text is white for better contrast.
+ * - Removed light/dark mode toggle (dark theme only).
+ * - Removed the large "Results" bubble header.
+ * - Removed the top banner; a simple title line is used instead.
  *
- * Prior behavior/logic retained (warnings at top, MI logic, temp buydowns, fees, compensation, etc.).
+ * Core rules retained:
+ * - Do NOT display a Funding Fee line for **Conventional** loans (not even $0).
+ * - FHA shows UFMIP when applicable; VA/IRRRL show Funding Fee only when > $0 and not exempt.
+ * - Warnings live at the top of the INPUT column (LTV & program rules, points > 4.75%).
+ * - Global Previous PITI input used for all savings calcs.
+ * - Debt consolidation savings = (Prev PITI + previous monthly debt payments) − NEW PITI. No PI-only savings anywhere.
+ * - Temp buydowns (2/1, 1/0) are Conventional-only and disabled when Cash Out > 0. Subsidy is financed.
  */
 
-export default function MortgageCalculator() {
+export default function MortgageCalculatorIndigoDark() {
   // ===== Inputs =====
   const [borrowerName, setBorrowerName] = useState<string>("");
   const [goal, setGoal] = useState<string>("");
@@ -33,7 +41,7 @@ export default function MortgageCalculator() {
   const [debtPaid, setDebtPaid] = useState<number | "">("");
   const [debtMonthly, setDebtMonthly] = useState<number | "">("");
 
-  // Previous PITI — single global input used everywhere
+  // Previous PITI — single global input
   const [currentPITI, setCurrentPITI] = useState<number | "">("");
 
   // Treat cash‑out as pure cash to borrower (no consolidation)
@@ -73,7 +81,6 @@ export default function MortgageCalculator() {
   };
   const fmt = (num: number) => num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  // Infer BG Tier from BG % input
   const deriveBgTier = (bgPct: number): "BG1" | "BG2" | "BG3" | "BG4" | "—" => {
     if (bgPct >= 2.25 && bgPct <= 3.0) return "BG1";
     if (bgPct >= 1.5 && bgPct < 2.25) return "BG2";
@@ -171,13 +178,11 @@ export default function MortgageCalculator() {
   const debtPaidApplied = isConsolidating ? Math.min(effectiveCashOut, n(debtPaid)) : 0;
   const cashToBorrower = isConsolidating ? Math.max(0, effectiveCashOut - debtPaidApplied) : effectiveCashOut;
 
-  // Savings calcs vs Previous — GLOBAL
+  // Savings calcs vs Previous — GLOBAL (no PI-only savings shown)
   const prevPITI = n(currentPITI);
   const savingsVsPrev = Math.max(0, prevPITI - basePITI);
 
-  // Debt Consolidation savings — EXACTLY as requested:
-  //   TOTAL_PREV_OUTFLOW = Previous PITI + Previous monthly debt payments
-  //   DC_MONTHLY_SAVINGS = TOTAL_PREV_OUTFLOW - NEW_PITI
+  // Debt Consolidation savings: (Prev PITI + previous monthly debt payments) − NEW PITI
   const dcTotalPrevOutflow = isConsolidating ? prevPITI + n(debtMonthly) : 0;
   const dcMonthlySavings = isConsolidating ? Math.max(0, dcTotalPrevOutflow - basePITI) : 0;
 
@@ -203,351 +208,376 @@ export default function MortgageCalculator() {
   const twoOneDisabled = loanType === "Conventional" && effectiveCashOut > 0;
   const oneZeroDisabled = loanType === "Conventional" && effectiveCashOut > 0;
 
-  // Gentle warning helper when user entered cash‑out but no consolidation details and didn't toggle pureCashOut
   const showCashOutNoConsolWarning = effectiveCashOut > 0 && !pureCashOut && n(debtPaid) === 0 && n(debtMonthly) === 0;
 
-  // ===== Program/LTV warnings (conditions) =====
+  // ===== Program/LTV warnings =====
   const fhaLtvImpossible = loanType === "FHA" && ltv > 80;
   const convMiWarning    = loanType === "Conventional" && ltv > 80; // MI will apply
   const convCashoutOver80 = loanType === "Conventional" && effectiveCashOut > 0 && ltv > 80; // cash-out not allowed
   const convRateTermOver96 = loanType === "Conventional" && effectiveCashOut === 0 && ltv > 96; // rate/term over 96 not allowed
 
-  // ===== Top-of-input warnings block =====
-  const TopWarnings = () => (
+  // ===== UI helpers =====
+  const SectionTitle = ({ children }: { children: React.ReactNode }) => (
+    <h3 className="text-sm font-semibold tracking-wide uppercase text-indigo-400">{children}</h3>
+  );
+
+  const StatBox = ({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) => (
+    <div className={`rounded-2xl border p-3 ${accent ? "bg-indigo-500/10 border-indigo-500/40" : "bg-slate-900/40 border-slate-700"}`}>
+      <div className="text-xs text-slate-400">{label}</div>
+      <div className="text-lg font-semibold text-slate-100">{value}</div>
+    </div>
+  );
+
+  const WarningsBlock = () => (
     <div className="space-y-2">
-      {/* Points threshold exceeded */}
       {pointsTooHigh && (
-        <div className="rounded-xl border p-3 bg-red-50 text-red-700">
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-red-200">
           <h4 className="font-semibold">Total points exceed 4.75%</h4>
           <p className="text-xs mt-1">Reduce Cost on UWM or Branch Gen to ≤ 4.75% combined or you may trigger a backend cost fail.</p>
         </div>
       )}
 
-      {/* Program/LTV rules */}
       {loanType === "FHA" && fhaLtvImpossible && (
-        <div className="rounded-xl border p-3 bg-red-50 text-red-700">
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-red-200">
           <h4 className="font-semibold">FHA LTV exceeds 80%</h4>
           <p className="text-xs mt-1">This scenario is not possible under FHA guidelines.</p>
         </div>
       )}
       {loanType === "Conventional" && convRateTermOver96 && (
-        <div className="rounded-xl border p-3 bg-red-50 text-red-700">
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-red-200">
           <h4 className="font-semibold">Conventional Rate/Term over 96% LTV</h4>
-          <p className="text-xs mt-1">We can’t do Rate &amp; Term refinances above 96% LTV.</p>
+          <p className="text-xs mt-1">We can’t do Rate & Term refinances above 96% LTV.</p>
         </div>
       )}
       {loanType === "Conventional" && convCashoutOver80 && (
-        <div className="rounded-xl border p-3 bg-red-50 text-red-700">
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-red-200">
           <h4 className="font-semibold">Conventional Cash‑Out over 80% LTV</h4>
           <p className="text-xs mt-1">Cash‑out is not allowed above 80% LTV for Conventional loans.</p>
         </div>
       )}
       {loanType === "Conventional" && convMiWarning && !convCashoutOver80 && (
-        <div className="rounded-xl border p-3 bg-amber-50 text-amber-800">
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-amber-100">
           <h4 className="font-semibold">Conventional LTV over 80%</h4>
           <p className="text-xs mt-1">Mortgage Insurance (MI) will be added. Cash‑out is not permitted above 80% LTV.</p>
         </div>
       )}
 
-      {/* Cash‑out entered but unclear consolidation intent */}
       {showCashOutNoConsolWarning && (
-        <div className="rounded-xl border p-3 bg-amber-50 text-amber-800">
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-amber-100">
           <h4 className="font-semibold">Cash‑out entered without consolidation details</h4>
-          <p className="text-xs mt-1">If this cash‑out is <strong>not</strong> for paying off debts, enable “Not consolidating debt.” Otherwise, add the debt amounts so we can estimate true monthly savings.</p>
+          <p className="text-xs mt-1">If this cash‑out is <strong>not</strong> for paying off debts, enable “Not consolidating debt.” Otherwise, add debt amounts so we can estimate true monthly savings.</p>
         </div>
       )}
 
-      {/* Temp buydown disabled notice */}
       {(twoOneDisabled || oneZeroDisabled) && (
-        <div className="rounded-xl border p-3 bg-amber-50 text-amber-800">
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-amber-100">
           <h4 className="font-semibold">Temporary buydown disabled</h4>
           <p className="text-xs mt-1">2/1 and 1/0 buydowns are disabled when Cash Out &gt; 0.</p>
         </div>
       )}
 
-      {/* General Points & BG Guidance (always helpful) */}
-      <div className="rounded-xl border p-3 bg-slate-50 text-slate-800">
+      <div className="rounded-xl border border-slate-600 bg-slate-800/60 p-3 text-slate-200">
         <h4 className="font-semibold">Points & BG Guidance</h4>
         <p className="text-xs mt-1">Keep total points (Cost on UWM + Branch Gen) ≤ <strong>4.75%</strong> to avoid backend cost fails. Avoid the bare minimum BG tier; if a cost fail occurs, you could slip from <strong>BG1</strong> to <strong>BG2</strong>, impacting compensation and pricing.</p>
       </div>
     </div>
   );
 
+  const inputCls = "mt-1 bg-slate-950 border-slate-700 text-white placeholder-slate-400";
+  const selectCls = "mt-1 border rounded-xl p-2.5 w-full bg-slate-950 border-slate-700 text-white";
+
   return (
-    <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-      {/* ===== Inputs (warnings pinned to top) ===== */}
-      <Card className="shadow-lg rounded-2xl p-4">
-        <CardContent className="space-y-4">
-          <h2 className="text-xl font-bold">Mortgage Calculator</h2>
+    <div className="dark">
+      <div className="min-h-dvh bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100">
+        {/* Simple Title (no banner) */}
+        <div className="mx-auto max-w-7xl px-4 py-4">
+          <h1 className="text-xl font-semibold tracking-tight">Ultimate Mortgage Calculator</h1>
+        </div>
 
-          {/* TOP WARNINGS */}
-          <TopWarnings />
+        {/* Content */}
+        <main className="mx-auto max-w-7xl px-4 pb-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* ===== Inputs (warnings pinned to top) ===== */}
+          <Card className="rounded-2xl border-slate-800 bg-slate-900/60 shadow-xl">
+            <CardContent className="space-y-4 p-5">
+              {/* TOP WARNINGS */}
+              <WarningsBlock />
 
-          {/* Borrower Name */}
-          <div>
-            <Label>Borrower Name</Label>
-            <Input type="text" placeholder="e.g., Jane Doe" value={borrowerName} onChange={(e) => setBorrowerName(e.target.value)} />
-          </div>
-
-          {/* Borrower Goal */}
-          <div>
-            <Label>Borrower Goal</Label>
-            <Input type="text" placeholder="e.g., Lower payment & pay off cards" value={goal} onChange={(e) => setGoal(e.target.value)} />
-          </div>
-
-          {/* Previous PITI (GLOBAL) */}
-          <div>
-            <Label>Previous Monthly PITI ($/mo)</Label>
-            <Input type="number" value={currentPITI} onChange={(e) => setCurrentPITI(e.target.value === "" ? "" : Number(e.target.value))} />
-            <p className="text-xs text-gray-600 mt-1">Used to compare savings vs the new payment, plus Year 1/2 buydown savings when applicable.</p>
-          </div>
-
-          {/* Loan Type + VA Exempt */}
-          <div className="flex items-center gap-4">
-            <div className="flex-1">
-              <Label>Loan Type</Label>
-              <select className="border rounded p-2 w-full" value={loanType} onChange={(e) => setLoanType(e.target.value)}>
-                <option value="Conventional">Conventional</option>
-                <option value="VA">VA</option>
-                <option value="FHA">FHA</option>
-                <option value="VA IRRRL">VA IRRRL</option>
-              </select>
-            </div>
-            {(loanType === "VA" || loanType === "VA IRRRL") && (
-              <div className="flex items-center">
-                <Checkbox checked={isFundingFeeExempt} onCheckedChange={(v) => setIsFundingFeeExempt(!!v)} />
-                <Label className="ml-2">Exempt from Funding Fee</Label>
+              {/* Borrower Name */}
+              <div>
+                <Label className="text-slate-300">Borrower Name</Label>
+                <Input className={inputCls} type="text" placeholder="e.g., Jane Doe" value={borrowerName} onChange={(e) => setBorrowerName(e.target.value)} />
               </div>
-            )}
-          </div>
 
-          {/* Appraised Value */}
-          <div>
-            <Label>Appraised Value ($)</Label>
-            <Input type="number" value={appraisedValue} onChange={(e) => setAppraisedValue(e.target.value === "" ? "" : Number(e.target.value))} />
-          </div>
+              {/* Borrower Goal */}
+              <div>
+                <Label className="text-slate-300">Borrower Goal</Label>
+                <Input className={inputCls} type="text" placeholder="e.g., Lower payment & pay off cards" value={goal} onChange={(e) => setGoal(e.target.value)} />
+              </div>
 
-          {/* Current Loan Balance */}
-          <div>
-            <Label>Current Loan Balance ($)</Label>
-            <Input type="number" value={balance} onChange={(e) => setBalance(e.target.value === "" ? "" : Number(e.target.value))} />
-          </div>
+              {/* Previous PITI (GLOBAL) */}
+              <div>
+                <Label className="text-slate-300">Previous Monthly PITI ($/mo)</Label>
+                <Input className={inputCls} type="number" value={currentPITI} onChange={(e) => setCurrentPITI(e.target.value === "" ? "" : Number(e.target.value))} />
+                <p className="text-xs text-slate-400 mt-1">Used to compare savings vs the new payment, plus Year 1/2 buydown savings when applicable.</p>
+              </div>
 
-          {/* Cash Out — hidden for VA IRRRL */}
-          {loanType !== "VA IRRRL" && (
-            <div>
-              <Label>Cash Out ($)</Label>
-              <Input type="number" value={cashOut} onChange={(e) => setCashOut(e.target.value === "" ? "" : Number(e.target.value))} />
-              {/* Pure cash‑out toggle */}
-              {n(cashOut) > 0 && (
-                <div className="mt-2 flex items-center">
-                  <Checkbox checked={pureCashOut} onCheckedChange={(v) => setPureCashOut(!!v)} />
-                  <span className="ml-2 text-sm">Not consolidating debt (treat all cash‑out as Cash to Borrower)</span>
+              {/* Loan Type + VA Exempt */}
+              <div className="flex flex-col sm:flex-row sm:items-end gap-4">
+                <div className="flex-1">
+                  <Label className="text-slate-300">Loan Type</Label>
+                  <select className={selectCls} value={loanType} onChange={(e) => setLoanType(e.target.value)}>
+                    <option value="Conventional">Conventional</option>
+                    <option value="VA">VA</option>
+                    <option value="FHA">FHA</option>
+                    <option value="VA IRRRL">VA IRRRL</option>
+                  </select>
+                </div>
+                {(loanType === "VA" || loanType === "VA IRRRL") && (
+                  <div className="flex items-center h-10 mt-1">
+                    <Checkbox checked={isFundingFeeExempt} onCheckedChange={(v) => setIsFundingFeeExempt(!!v)} />
+                    <Label className="ml-2 text-slate-300">Exempt from Funding Fee</Label>
+                  </div>
+                )}
+              </div>
+
+              {/* Appraised Value */}
+              <div>
+                <Label className="text-slate-300">Appraised Value ($)</Label>
+                <Input className={inputCls} type="number" value={appraisedValue} onChange={(e) => setAppraisedValue(e.target.value === "" ? "" : Number(e.target.value))} />
+              </div>
+
+              {/* Current Loan Balance */}
+              <div>
+                <Label className="text-slate-300">Current Loan Balance ($)</Label>
+                <Input className={inputCls} type="number" value={balance} onChange={(e) => setBalance(e.target.value === "" ? "" : Number(e.target.value))} />
+              </div>
+
+              {/* Cash Out — hidden for VA IRRRL */}
+              {loanType !== "VA IRRRL" && (
+                <div>
+                  <Label className="text-slate-300">Cash Out ($)</Label>
+                  <Input className={inputCls} type="number" value={cashOut} onChange={(e) => setCashOut(e.target.value === "" ? "" : Number(e.target.value))} />
+                  {n(cashOut) > 0 && (
+                    <div className="mt-2 flex items-center">
+                      <Checkbox checked={pureCashOut} onCheckedChange={(v) => setPureCashOut(!!v)} />
+                      <span className="ml-2 text-sm text-slate-300">Not consolidating debt (treat all cash‑out as Cash to Borrower)</span>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
-          )}
 
-          {/* Monthly Escrow */}
-          <div>
-            <Label>Monthly Escrow ($)</Label>
-            <Input type="number" value={monthlyEscrow} onChange={(e) => setMonthlyEscrow(e.target.value === "" ? "" : Number(e.target.value))} />
-          </div>
-
-          {/* Escrow Months */}
-          <div>
-            <Label>Escrow Months</Label>
-            <Input type="number" value={escrowMonths} onChange={(e) => setEscrowMonths(e.target.value === "" ? "" : Number(e.target.value))} />
-          </div>
-
-          {/* Underwriting / Bank Fee */}
-          <div>
-            <Label>Underwriting / Bank Fee ($)</Label>
-            <Input type="number" value={bankFee} onChange={(e) => setBankFee(e.target.value === "" ? "" : Number(e.target.value))} />
-            <p className="text-xs text-gray-600 mt-1">Defaults to $2350 (or $1500 for VA IRRRL). Adjust as needed.</p>
-          </div>
-
-          {/* Title Fee */}
-          <div>
-            <Label>Title Fee ($)</Label>
-            <Input type="number" value={titleFee} onChange={(e) => setTitleFee(e.target.value === "" ? "" : Number(e.target.value))} />
-          </div>
-
-          {/* Debt Consolidation (shown only when cash‑out and NOT pure cash‑out) */}
-          {effectiveCashOut > 0 && !pureCashOut && (
-            <div className="rounded-xl border p-3 mt-2 space-y-2">
-              <Label className="font-semibold">Debt Consolidation</Label>
-              {/* NOTE: NO PITI FIELD HERE — we use the global Previous PITI above */}
+              {/* Monthly Escrow */}
               <div>
-                <Label>Total Debt Being Paid Off ($)</Label>
-                <Input type="number" value={debtPaid} onChange={(e) => setDebtPaid(e.target.value === "" ? "" : Number(e.target.value))} />
+                <Label className="text-slate-300">Monthly Escrow ($)</Label>
+                <Input className={inputCls} type="number" value={monthlyEscrow} onChange={(e) => setMonthlyEscrow(e.target.value === "" ? "" : Number(e.target.value))} />
               </div>
+
+              {/* Escrow Months */}
               <div>
-                <Label>Current Monthly Payments on That Debt ($/mo)</Label>
-                <Input type="number" value={debtMonthly} onChange={(e) => setDebtMonthly(e.target.value === "" ? "" : Number(e.target.value))} />
-                <p className="text-xs text-gray-600 mt-1">Debt-consolidation savings compare (Prev PITI + these monthly payments) vs the new PITI.</p>
+                <Label className="text-slate-300">Escrow Months</Label>
+                <Input className={inputCls} type="number" value={escrowMonths} onChange={(e) => setEscrowMonths(e.target.value === "" ? "" : Number(e.target.value))} />
               </div>
-            </div>
-          )}
 
-          {/* Cost on UWM */}
-          <div>
-            <Label>Cost on UWM (%)</Label>
-            <Input type="number" step="0.01" value={uwmPoints} onChange={(e) => setUwmPoints(e.target.value === "" ? "" : Number(e.target.value))} />
-          </div>
+              {/* Underwriting / Bank Fee */}
+              <div>
+                <Label className="text-slate-300">Underwriting / Bank Fee ($)</Label>
+                <Input className={inputCls} type="number" value={bankFee} onChange={(e) => setBankFee(e.target.value === "" ? "" : Number(e.target.value))} />
+                <p className="text-xs text-slate-400 mt-1">Defaults to $2350 (or $1500 for VA IRRRL). Adjust as needed.</p>
+              </div>
 
-          {/* Branch Gen */}
-          <div>
-            <Label>Branch Gen (BG %) — free input</Label>
-            <Input type="number" step="0.01" value={branchGenPointsInput} onChange={(e) => setBranchGenPointsInput(e.target.value === "" ? "" : Number(e.target.value))} />
-            <div className="text-xs text-gray-600 mt-1">
-              <div>BG1: 2.25–3.00 • BG2: 1.50–2.25 • BG3: 0.75–1.50 • BG4: 0.74 and below</div>
-              <div className="mt-1">Inferred Tier: <span className="font-semibold">{deriveBgTier(n(branchGenPointsInput))}</span></div>
-            </div>
-          </div>
+              {/* Title Fee */}
+              <div>
+                <Label className="text-slate-300">Title Fee ($)</Label>
+                <Input className={inputCls} type="number" value={titleFee} onChange={(e) => setTitleFee(e.target.value === "" ? "" : Number(e.target.value))} />
+              </div>
 
-          {/* Interest Rate */}
-          <div>
-            <Label>Interest Rate (%) <span className="text-xs text-gray-500">(NEW rate chosen on rate sheet)</span></Label>
-            <Input type="number" step="0.001" value={interestRate} onChange={(e) => setInterestRate(e.target.value === "" ? "" : Number(e.target.value))} />
-          </div>
-
-          {/* Term */}
-          <div>
-            <Label>Term (Years)</Label>
-            <Input type="number" value={termYears} onChange={(e) => setTermYears(e.target.value === "" ? "" : Number(e.target.value))} />
-          </div>
-
-          {/* Conv MI Rate shown only when needed */}
-          {loanType === "Conventional" && ltv > 80 && (
-            <div>
-              <Label>Mortgage Insurance Rate (Annual %)</Label>
-              <Input type="number" step="0.001" value={(mortgageInsuranceRate * 100).toFixed(3)} onChange={(e) => setMortgageInsuranceRate(Number(e.target.value) / 100)} />
-            </div>
-          )}
-
-          {/* Temporary Buydown (Conventional only) */}
-          {loanType === "Conventional" && (
-            <div className="mt-2 space-y-2">
-              <Label className="font-semibold">Temporary Buydown (Conventional only)</Label>
-              <div className="flex items-center gap-6">
-                <div className="flex items-center">
-                  <Checkbox disabled={twoOneDisabled} checked={twoOneBuydown && !twoOneDisabled} onCheckedChange={(v) => { if (!twoOneDisabled) { setTwoOneBuydown(!!v); if (v) setOneZeroBuydown(false); } }} />
-                  <span className={`ml-2 ${twoOneDisabled ? "text-gray-400" : ""}`}>2/1 Buydown (Y1 -2%, Y2 -1%)</span>
+              {/* Debt Consolidation (only when cash‑out and NOT pure cash‑out) */}
+              {effectiveCashOut > 0 && !pureCashOut && (
+                <div className="rounded-2xl border border-slate-700 p-3 mt-2 space-y-2 bg-slate-900/60">
+                  <Label className="font-semibold text-slate-200">Debt Consolidation</Label>
+                  <div>
+                    <Label className="text-slate-300">Total Debt Being Paid Off ($)</Label>
+                    <Input className={inputCls} type="number" value={debtPaid} onChange={(e) => setDebtPaid(e.target.value === "" ? "" : Number(e.target.value))} />
+                  </div>
+                  <div>
+                    <Label className="text-slate-300">Current Monthly Payments on That Debt ($/mo)</Label>
+                    <Input className={inputCls} type="number" value={debtMonthly} onChange={(e) => setDebtMonthly(e.target.value === "" ? "" : Number(e.target.value))} />
+                    <p className="text-xs text-slate-400 mt-1">Savings compare (Prev PITI + these monthly payments) vs the new PITI.</p>
+                  </div>
                 </div>
-                <div className="flex items-center">
-                  <Checkbox disabled={oneZeroDisabled} checked={oneZeroBuydown && !oneZeroDisabled} onCheckedChange={(v) => { if (!oneZeroDisabled) { setOneZeroBuydown(!!v); if (v) setTwoOneBuydown(false); } }} />
-                  <span className={`ml-2 ${oneZeroDisabled ? "text-gray-400" : ""}`}>1/0 Buydown (Y1 -1%)</span>
+              )}
+
+              {/* Cost on UWM */}
+              <div>
+                <Label className="text-slate-300">Cost on UWM (%)</Label>
+                <Input className={inputCls} type="number" step="0.01" value={uwmPoints} onChange={(e) => setUwmPoints(e.target.value === "" ? "" : Number(e.target.value))} />
+              </div>
+
+              {/* Branch Gen */}
+              <div>
+                <Label className="text-slate-300">Branch Gen (BG %) — free input</Label>
+                <Input className={inputCls} type="number" step="0.01" value={branchGenPointsInput} onChange={(e) => setBranchGenPointsInput(e.target.value === "" ? "" : Number(e.target.value))} />
+                <div className="text-xs text-slate-400 mt-1">
+                  <div>BG1: 2.25–3.00 • BG2: 1.50–2.25 • BG3: 0.75–1.50 • BG4: 0.74 and below</div>
+                  <div className="mt-1">Inferred Tier: <span className="font-semibold text-slate-200">{deriveBgTier(n(branchGenPointsInput))}</span></div>
                 </div>
               </div>
-              <p className="text-xs text-gray-600">Subsidy cost is estimated using the pre‑subsidy financed amount and then financed into the loan.</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
-      {/* ===== Results ===== */}
-      <Card className="shadow-lg rounded-2xl p-4">
-        <CardContent className="space-y-4">
-          <h2 className="text-xl font-bold">Results</h2>
+              {/* Interest Rate */}
+              <div>
+                <Label className="text-slate-300">Interest Rate (%) <span className="text-xs text-slate-400">(NEW rate chosen on rate sheet)</span></Label>
+                <Input className={inputCls} type="number" step="0.001" value={interestRate} onChange={(e) => setInterestRate(e.target.value === "" ? "" : Number(e.target.value))} />
+              </div>
 
-          {/* Loan Type at Top of Output */}
-          <div className="rounded-2xl border p-3 bg-indigo-50 text-indigo-900">
-            <div className="text-xs uppercase tracking-wide">Loan Type</div>
-            <div className="text-lg font-semibold">{loanType}</div>
-          </div>
+              {/* Term */}
+              <div>
+                <Label className="text-slate-300">Term (Years)</Label>
+                <Input className={inputCls} type="number" value={termYears} onChange={(e) => setTermYears(e.target.value === "" ? "" : Number(e.target.value))} />
+              </div>
 
-          {(borrowerName || goal) && (
-            <div className="rounded-xl bg-slate-50 border p-3">
-              <h3 className="font-semibold">{borrowerName ? `${borrowerName}'s Goal` : "Borrower Goal"}</h3>
-              <p className="text-sm">{goal || "—"}</p>
-            </div>
-          )}
+              {/* Conv MI Rate shown only when needed */}
+              {loanType === "Conventional" && ltv > 80 && (
+                <div>
+                  <Label className="text-slate-300">Mortgage Insurance Rate (Annual %)</Label>
+                  <Input className={inputCls} type="number" step="0.001" value={(mortgageInsuranceRate * 100).toFixed(3)} onChange={(e) => setMortgageInsuranceRate(Number(e.target.value) / 100)} />
+                </div>
+              )}
 
-          <div className="space-y-1">
-            <h3 className="font-semibold">Loan & Cost Breakdown</h3>
-            <p><strong>Base Loan (Before Points):</strong> ${fmt(baseLoanWithGovFee)}</p>
-            {/* Show fee line for FHA/VA/IRRRL only; hide entirely for Conventional and also hide when $0 */}
-            {loanType !== "Conventional" && n(feeAmount) > 0 && (
-              <p><strong>{feeLabel}:</strong> ${fmt(feeAmount)}</p>
-            )}
-            <p><strong>Total Points Entered:</strong> {totalPointsEntered.toFixed(2)}%</p>
-            <p><strong>Points Cost:</strong> ${fmt(pointsCost)}</p>
-            <p><strong>Escrow Prepaid:</strong> ${fmt(escrowCost)}</p>
-            <p><strong>Underwriting (Bank + Title):</strong> ${fmt(n(bankFee) + n(titleFee))}</p>
-            {showTempBuydown && (
-              <>
-                <p><strong>Temp Buydown Subsidy (financed):</strong> ${fmt(buydownSubsidyCost)}</p>
-                <p className="text-xs text-gray-500">Year 1 diff: ${fmt(diffY1)}{twoOneBuydown ? ` • Year 2 diff: $${fmt(diffY2)}` : ""}</p>
-              </>
-            )}
-            <p><strong>Total Costs:</strong> ${fmt(baseTotalCostsNoBuydown + buydownSubsidyCost)}</p>
-            <p><strong>Final Loan Amount:</strong> ${fmt(finalLoanAmount)}</p>
-            {n(appraisedValue) > 0 && <p><strong>LTV:</strong> {ltv.toFixed(2)}%</p>}
-          </div>
+              {/* Temporary Buydown (Conventional only) */}
+              {loanType === "Conventional" && (
+                <div className="mt-2 space-y-2">
+                  <Label className="font-semibold text-slate-200">Temporary Buydown (Conventional only)</Label>
+                  <div className="flex items-center gap-6">
+                    <div className="flex items-center">
+                      <Checkbox disabled={twoOneDisabled} checked={twoOneBuydown && !twoOneDisabled} onCheckedChange={(v) => { if (!twoOneDisabled) { setTwoOneBuydown(!!v); if (v) setOneZeroBuydown(false); } }} />
+                      <span className={`ml-2 text-sm ${twoOneDisabled ? "text-slate-500" : "text-slate-300"}`}>2/1 Buydown (Y1 -2%, Y2 -1%)</span>
+                    </div>
+                    <div className="flex items-center">
+                      <Checkbox disabled={oneZeroDisabled} checked={oneZeroBuydown && !oneZeroDisabled} onCheckedChange={(v) => { if (!oneZeroDisabled) { setOneZeroBuydown(!!v); if (v) setTwoOneBuydown(false); } }} />
+                      <span className={`ml-2 text-sm ${oneZeroDisabled ? "text-slate-500" : "text-slate-300"}`}>1/0 Buydown (Y1 -1%)</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-400">Subsidy cost is estimated using the pre‑subsidy financed amount and then financed into the loan.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-          <div className="space-y-1">
-            <h3 className="font-semibold">Monthly PITI Breakdown</h3>
-            <p><strong>Principal & Interest:</strong> ${fmt(PI)}</p>
-            <p><strong>Escrow:</strong> ${fmt(n(monthlyEscrow))}</p>
-            {loanType === "FHA" && <p><strong>MIP:</strong> ${fmt(mipMonthly)}</p>}
-            {loanType === "Conventional" && ltv > 80 && <p><strong>Mortgage Insurance:</strong> ${fmt(miMonthly)}</p>}
-            <p className="text-lg font-bold text-green-600"><strong>Total Monthly Payment (New PITI):</strong> ${fmt(basePITI)}</p>
-          </div>
+          {/* ===== Results ===== */}
+          <Card className="rounded-2xl border-slate-800 bg-slate-900/60 shadow-xl">
+            <CardContent className="space-y-5 p-5">
+              {/* Loan Type at Top of Output (no bubble header) */}
+              <div className="rounded-2xl border border-indigo-500/30 p-3 bg-indigo-950/40">
+                <div className="text-xs uppercase tracking-wide text-indigo-300">Loan Type</div>
+                <div className="text-lg font-semibold text-indigo-100">{loanType}</div>
+              </div>
 
-          {/* Savings vs Previous (GLOBAL) */}
-          <div className="space-y-1">
-            <h3 className="font-semibold">Savings vs Previous</h3>
-            <p><strong>Previous PITI:</strong> ${fmt(prevPITI)}</p>
-            <p className="text-green-600"><strong>Monthly Savings (Base vs Previous):</strong> ${fmt(savingsVsPrev)}</p>
-            {showTempBuydown && (
-              <>
-                {twoOneBuydown && (
-                  <>
-                    <p><strong>Year 1 PITI:</strong> ${fmt(y1PITI)} — <span className="text-green-600">Saves ${fmt(savingsY1VsPrev)} vs previous</span></p>
-                    <p><strong>Year 2 PITI:</strong> ${fmt(y2PITI)} — <span className="text-green-600">Saves ${fmt(savingsY2VsPrev)} vs previous</span></p>
-                  </>
+              {(borrowerName || goal) && (
+                <div className="rounded-2xl bg-slate-950 border border-slate-800 p-3">
+                  <h3 className="font-semibold text-slate-200">{borrowerName ? `${borrowerName}'s Goal` : "Borrower Goal"}</h3>
+                  <p className="text-sm text-slate-300">{goal || "—"}</p>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                <SectionTitle>Loan & Cost Breakdown</SectionTitle>
+                <div className="grid grid-cols-2 gap-3">
+                  <StatBox label="Base Loan (Before Points)" value={`$${fmt(baseLoanWithGovFee)}`} accent />
+                  {loanType !== "Conventional" && n(feeAmount) > 0 && (
+                    <StatBox label={feeLabel} value={`$${fmt(feeAmount)}`} />
+                  )}
+                  <StatBox label="Total Points Entered" value={`${totalPointsEntered.toFixed(2)}%`} />
+                  <StatBox label="Points Cost" value={`$${fmt(pointsCost)}`} />
+                  <StatBox label="Escrow Prepaid" value={`$${fmt(escrowCost)}`} />
+                  <StatBox label="UW (Bank + Title)" value={`$${fmt(n(bankFee) + n(titleFee))}`} />
+                  {showTempBuydown && (
+                    <StatBox label="Temp Buydown Subsidy (financed)" value={`$${fmt(buydownSubsidyCost)}`} />
+                  )}
+                  <StatBox label="Total Costs" value={`$${fmt(baseTotalCostsNoBuydown + buydownSubsidyCost)}`} />
+                  <StatBox label="Final Loan Amount" value={`$${fmt(finalLoanAmount)}`} accent />
+                  {n(appraisedValue) > 0 && <StatBox label="LTV" value={`${ltv.toFixed(2)}%`} />}
+                </div>
+                {showTempBuydown && (
+                  <p className="text-xs text-slate-400">Year 1 diff: ${fmt(diffY1)}{twoOneBuydown ? ` • Year 2 diff: $${fmt(diffY2)}` : ""}</p>
                 )}
-                {oneZeroBuydown && (
-                  <p><strong>Year 1 PITI:</strong> ${fmt(y1PITI)} — <span className="text-green-600">Saves ${fmt(savingsY1VsPrev)} vs previous</span></p>
+              </div>
+
+              <div className="space-y-3">
+                <SectionTitle>Monthly PITI Breakdown</SectionTitle>
+                <div className="grid grid-cols-2 gap-3">
+                  <StatBox label="Principal & Interest" value={`$${fmt(PI)}`} />
+                  <StatBox label="Escrow" value={`$${fmt(n(monthlyEscrow))}`} />
+                  {loanType === "FHA" && <StatBox label="MIP" value={`$${fmt(mipMonthly)}`} />}
+                  {loanType === "Conventional" && ltv > 80 && <StatBox label="Mortgage Insurance" value={`$${fmt(miMonthly)}`} />}
+                  <StatBox label="Total Monthly Payment (New PITI)" value={`$${fmt(basePITI)}`} accent />
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <SectionTitle>Savings vs Previous</SectionTitle>
+                <div className="grid grid-cols-2 gap-3">
+                  <StatBox label="Previous PITI" value={`$${fmt(prevPITI)}`} />
+                  <StatBox label="Monthly Savings (Base vs Previous)" value={`$${fmt(savingsVsPrev)}`} accent />
+                </div>
+                {showTempBuydown && (
+                  <div className="grid grid-cols-2 gap-3">
+                    {twoOneBuydown && (
+                      <>
+                        <StatBox label="Year 1 PITI (vs Prev)" value={`$${fmt(y1PITI)} · saves $${fmt(savingsY1VsPrev)}`} />
+                        <StatBox label="Year 2 PITI (vs Prev)" value={`$${fmt(y2PITI)} · saves $${fmt(savingsY2VsPrev)}`} />
+                      </>
+                    )}
+                    {oneZeroBuydown && (
+                      <StatBox label="Year 1 PITI (vs Prev)" value={`$${fmt(y1PITI)} · saves $${fmt(savingsY1VsPrev)}`} />
+                    )}
+                  </div>
                 )}
-              </>
-            )}
-          </div>
+              </div>
 
-          {/* Debt Consolidation Summary */}
-          {isConsolidating && (
-            <div className="space-y-1 mt-3">
-              <h3 className="font-semibold">Debt Consolidation Summary</h3>
-              <p><strong>They currently pay on their debt:</strong> ${fmt(n(debtMonthly))}/mo</p>
-              <p><strong>Debt Being Paid Off:</strong> ${fmt(debtPaidApplied)}</p>
-              <p><strong>Cash to Borrower After Debts:</strong> ${fmt(cashToBorrower)}</p>
-              <p><strong>Total Previous Outflow (PITI + Debts):</strong> ${fmt(dcTotalPrevOutflow)}</p>
-              <p className="text-green-600"><strong>Total Monthly Savings vs NEW PITI:</strong> ${fmt(dcMonthlySavings)}</p>
-              <p className="text-xs text-gray-500">Savings = (Previous PITI + previous monthly debt payments) − NEW PITI. PI-only savings are intentionally NOT shown.</p>
-            </div>
-          )}
+              {isConsolidating && (
+                <div className="space-y-3">
+                  <SectionTitle>Debt Consolidation Summary</SectionTitle>
+                  <div className="grid grid-cols-2 gap-3">
+                    <StatBox label="They currently pay on their debt" value={`$${fmt(n(debtMonthly))}/mo`} />
+                    <StatBox label="Debt Being Paid Off" value={`$${fmt(debtPaidApplied)}`} />
+                    <StatBox label="Cash to Borrower After Debts" value={`$${fmt(cashToBorrower)}`} />
+                    <StatBox label="Total Previous Outflow" value={`$${fmt(dcTotalPrevOutflow)}`} />
+                    <StatBox label="Total Monthly Savings vs NEW PITI" value={`$${fmt(dcMonthlySavings)}`} accent />
+                  </div>
+                  <p className="text-xs text-slate-400">Savings = (Previous PITI + previous monthly debt payments) − NEW PITI. PI-only savings are intentionally NOT shown.</p>
+                </div>
+              )}
 
-          {/* Cash‑Out (No Debt Consolidation) Summary */}
-          {effectiveCashOut > 0 && !isConsolidating && (
-            <div className="space-y-1 mt-3">
-              <h3 className="font-semibold">Cash‑Out Summary (No Debt Consolidation)</h3>
-              <p><strong>Cash to Borrower:</strong> ${fmt(cashToBorrower)}</p>
-              <p className="text-xs text-gray-500">All cash‑out is treated as cash to borrower; debt consolidation fields were not used.</p>
-            </div>
-          )}
+              {effectiveCashOut > 0 && !isConsolidating && (
+                <div className="space-y-3">
+                  <SectionTitle>Cash‑Out Summary (No Debt Consolidation)</SectionTitle>
+                  <div className="grid grid-cols-2 gap-3">
+                    <StatBox label="Cash to Borrower" value={`$${fmt(cashToBorrower)}`} accent />
+                  </div>
+                  <p className="text-xs text-slate-400">All cash‑out is treated as cash to borrower; debt consolidation fields were not used.</p>
+                </div>
+              )}
 
-          {/* Compensation */}
-          <div className="space-y-1">
-            <h3 className="font-semibold">Compensation</h3>
-            <p><strong>Inferred BG Tier:</strong> {deriveBgTier(n(branchGenPointsInput))}</p>
-            <p><strong>Loan Officer:</strong> {loCompBps} bps → ${fmt(loCompensation)}</p>
-            <p><strong>Associate:</strong> {loaCompBps} bps → ${fmt(loaCompensation)}</p>
-          </div>
-        </CardContent>
-      </Card>
+              <div className="space-y-3">
+                <SectionTitle>Compensation</SectionTitle>
+                <div className="grid grid-cols-2 gap-3">
+                  <StatBox label="Inferred BG Tier" value={`${deriveBgTier(n(branchGenPointsInput))}`} />
+                  <StatBox label="Loan Officer" value={`${loCompBps} bps → $${fmt(loCompensation)}`} />
+                  <StatBox label="Associate" value={`${loaCompBps} bps → $${fmt(loaCompensation)}`} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </main>
+
+        {/* Footer */}
+        <footer className="py-6 text-center text-xs text-slate-500">
+          Built fresh with an indigo dark vibe. No conventional funding fee line is ever shown.
+        </footer>
+      </div>
     </div>
   );
 }
+
 
 
