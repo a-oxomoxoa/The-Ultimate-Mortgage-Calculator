@@ -7,22 +7,20 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 
 /**
- * Ultimate Mortgage Calculator — Fresh Recode (Sep 4, 2025)
+ * Ultimate Mortgage Calculator — Fresh Recode (Sep 7, 2025)
  *
- * Change in this version:
- * - ✅ Added an explicit check/toggle for "Cash‑out with NO debt consolidation".
- *   When enabled, the Debt Consolidation inputs are hidden and ALL cash‑out
- *   is treated as Cash to Borrower. A gentle warning appears if cash‑out is
- *   present but no consolidation details are entered and the toggle isn't set.
+ * FULL RECODE (per user instruction)
  *
- * Other recent features retained from prior recode:
- * - ⚠️ Points disclaimer block (keep total points ≤ 4.75%; avoid bare‑minimum BG).
- * - 🔼 Debt Consolidation section above Compensation in the output.
- * - 🪖 VA IRRRL: Cash‑out input removed (and ignored in math).
+ * Update in this build:
+ * - The output no longer shows a Funding Fee line for **Conventional** loans (not even $0).
+ * - FHA still shows UFMIP when applicable; VA/IRRRL still show Funding Fee when > $0 or not exempt.
+ *
+ * Prior behavior/logic retained (warnings at top, MI logic, temp buydowns, fees, compensation, etc.).
  */
 
 export default function MortgageCalculator() {
   // ===== Inputs =====
+  const [borrowerName, setBorrowerName] = useState<string>("");
   const [goal, setGoal] = useState<string>("");
   const [loanType, setLoanType] = useState("Conventional");
   const [appraisedValue, setAppraisedValue] = useState<number | "">("");
@@ -31,12 +29,14 @@ export default function MortgageCalculator() {
   const [monthlyEscrow, setMonthlyEscrow] = useState<number | "">("");
   const [escrowMonths, setEscrowMonths] = useState<number | "">(2);
 
-  // Debt consolidation & current PITI (to estimate accurate savings)
+  // Debt consolidation inputs (NO PITI HERE)
   const [debtPaid, setDebtPaid] = useState<number | "">("");
   const [debtMonthly, setDebtMonthly] = useState<number | "">("");
+
+  // Previous PITI — single global input used everywhere
   const [currentPITI, setCurrentPITI] = useState<number | "">("");
 
-  // NEW: Treat cash‑out as pure cash to borrower (no debt consolidation)
+  // Treat cash‑out as pure cash to borrower (no consolidation)
   const [pureCashOut, setPureCashOut] = useState<boolean>(false);
 
   // Costs & Points
@@ -62,8 +62,8 @@ export default function MortgageCalculator() {
   const VA_FUNDING_FEE_RATE = 0.033;   // 3.3%
   const VA_IRRRL_FEE_RATE   = 0.005;   // 0.5%
   const FHA_UFMIP_RATE      = 0.0175;  // 1.75%
-  const FHA_ANNUAL_MIP      = 0.0055;  // 0.55%/yr (rough default)
-  const TOTAL_POINTS_CAP    = 4.75;    // %
+  const FHA_ANNUAL_MIP      = 0.0055;  // 0.55%/yr (default)
+  const TOTAL_POINTS_ALERT  = 4.75;    // Threshold only (no capping)
 
   // ===== Utilities =====
   const n = (v: number | string | "") => {
@@ -84,24 +84,25 @@ export default function MortgageCalculator() {
   };
 
   // ===== Effects =====
-  // Adjust typical bank fee for VA IRRRL
   useEffect(() => {
+    // Adjust typical bank fee for VA IRRRL
+    if (loanType === "VA IRRRL" && n(bankFee) === 1500) return; // already set
     if (loanType === "VA IRRRL" && n(bankFee) === 2350) setBankFee(1500);
     if (loanType !== "VA IRRRL" && n(bankFee) === 1500) setBankFee(2350);
   }, [loanType]);
 
-  // Disable temp buydowns for non‑Conventional
   useEffect(() => {
+    // Disable temp buydowns for non‑Conventional
     if (loanType !== "Conventional") { setTwoOneBuydown(false); setOneZeroBuydown(false); }
   }, [loanType]);
 
-  // If user switches to VA IRRRL: clear and ignore cash‑out
   useEffect(() => {
+    // If user switches to VA IRRRL: clear and ignore cash‑out
     if (loanType === "VA IRRRL") setCashOut("");
   }, [loanType]);
 
-  // If there is no cash‑out (or switching programs), clear the pureCashOut toggle
   useEffect(() => {
+    // If there is no cash‑out (or switching programs), clear the pureCashOut toggle
     if (loanType === "VA IRRRL" || n(cashOut) === 0) setPureCashOut(false);
   }, [loanType, cashOut]);
 
@@ -118,12 +119,12 @@ export default function MortgageCalculator() {
   const ufmip = loanType === "FHA" ? baseLoanBeforePoints * FHA_UFMIP_RATE : 0;
   const baseLoanWithGovFee = baseLoanBeforePoints + fundingFee + ufmip;
 
+  // 🔁 No more capping. Just warn if total points exceed 4.75%
   const uwmPts = n(uwmPoints);
   const bgPts  = n(branchGenPointsInput);
   const totalPointsEntered = uwmPts + bgPts;
-  const totalPointsForCalc = Math.min(totalPointsEntered, TOTAL_POINTS_CAP);
-  const pointsWereCapped   = totalPointsEntered > TOTAL_POINTS_CAP;
-  const pointsCost = baseLoanWithGovFee * (totalPointsForCalc / 100);
+  const pointsCost = baseLoanWithGovFee * (totalPointsEntered / 100);
+  const pointsTooHigh = totalPointsEntered > TOTAL_POINTS_ALERT;
 
   const baseTotalCostsNoBuydown = n(bankFee) + n(titleFee) + escrowCost + pointsCost + fundingFee + ufmip;
   const finalLoanPreBuydown = n(balance) + effectiveCashOut + baseTotalCostsNoBuydown;
@@ -135,6 +136,7 @@ export default function MortgageCalculator() {
     return (principal * r) / (1 - Math.pow(1 + r, -nper));
   };
 
+  // Pre-buydown preview (used for subsidy costing)
   const PI_pre = monthlyPI(n(interestRate), finalLoanPreBuydown, n(termYears));
   const mipMonthly_pre = loanType === "FHA" ? (finalLoanPreBuydown * FHA_ANNUAL_MIP) / 12 : 0;
   const ltv_pre = n(appraisedValue) > 0 ? (finalLoanPreBuydown / n(appraisedValue)) * 100 : 0;
@@ -162,18 +164,22 @@ export default function MortgageCalculator() {
   const mipMonthly = loanType === "FHA" ? (finalLoanAmount * FHA_ANNUAL_MIP) / 12 : 0;
   const ltv = n(appraisedValue) > 0 ? (finalLoanAmount / n(appraisedValue)) * 100 : 0;
   const miMonthly = loanType === "Conventional" && ltv > 80 ? (finalLoanAmount * n(mortgageInsuranceRate)) / 12 : 0;
-  const basePITI = PI + n(monthlyEscrow) + mipMonthly + miMonthly;
+  const basePITI = PI + n(monthlyEscrow) + mipMonthly + miMonthly; // NEW Monthly PITI
 
-  // Debt Consolidation calcs
+  // Debt Consolidation conditions
   const isConsolidating = effectiveCashOut > 0 && !pureCashOut && (n(debtPaid) > 0 || n(debtMonthly) > 0);
   const debtPaidApplied = isConsolidating ? Math.min(effectiveCashOut, n(debtPaid)) : 0;
   const cashToBorrower = isConsolidating ? Math.max(0, effectiveCashOut - debtPaidApplied) : effectiveCashOut;
-  const addedMonthlyPIFromDebt = isConsolidating ? monthlyPI(n(interestRate), debtPaidApplied, n(termYears)) : 0;
-  const monthlySavingsFromConsolidation = isConsolidating ? Math.max(0, n(debtMonthly) - addedMonthlyPIFromDebt) : 0;
 
-  // New: total monthly savings using current PITI + current debt payments when consolidating
-  const currentAllInMonthly = n(currentPITI) + (isConsolidating ? n(debtMonthly) : 0);
-  const estimatedTotalMonthlySavings = Math.max(0, currentAllInMonthly - basePITI);
+  // Savings calcs vs Previous — GLOBAL
+  const prevPITI = n(currentPITI);
+  const savingsVsPrev = Math.max(0, prevPITI - basePITI);
+
+  // Debt Consolidation savings — EXACTLY as requested:
+  //   TOTAL_PREV_OUTFLOW = Previous PITI + Previous monthly debt payments
+  //   DC_MONTHLY_SAVINGS = TOTAL_PREV_OUTFLOW - NEW_PITI
+  const dcTotalPrevOutflow = isConsolidating ? prevPITI + n(debtMonthly) : 0;
+  const dcMonthlySavings = isConsolidating ? Math.max(0, dcTotalPrevOutflow - basePITI) : 0;
 
   const showTempBuydown = loanType === "Conventional" && (twoOneBuydown || oneZeroBuydown);
   const y1RatePct = twoOneBuydown ? n(interestRate) - 2 : oneZeroBuydown ? n(interestRate) - 1 : n(interestRate);
@@ -182,8 +188,10 @@ export default function MortgageCalculator() {
   const y2PI = monthlyPI(y2RatePct, finalLoanAmount, n(termYears));
   const y1PITI = y1PI + n(monthlyEscrow) + mipMonthly + miMonthly;
   const y2PITI = y2PI + n(monthlyEscrow) + mipMonthly + miMonthly;
+  const savingsY1VsPrev = Math.max(0, prevPITI - y1PITI);
+  const savingsY2VsPrev = Math.max(0, prevPITI - y2PITI);
 
-  const inferredBgTier = deriveBgTier(bgPts);
+  const inferredBgTier = deriveBgTier(n(branchGenPointsInput));
   const loCompBps = LO_COMP_BPS[inferredBgTier] ?? 0;
   const loaCompBps = LOA_COMP_BPS[inferredBgTier] ?? 0;
   const loCompensation  = finalLoanAmount * (loCompBps / 10000);
@@ -198,17 +206,100 @@ export default function MortgageCalculator() {
   // Gentle warning helper when user entered cash‑out but no consolidation details and didn't toggle pureCashOut
   const showCashOutNoConsolWarning = effectiveCashOut > 0 && !pureCashOut && n(debtPaid) === 0 && n(debtMonthly) === 0;
 
+  // ===== Program/LTV warnings (conditions) =====
+  const fhaLtvImpossible = loanType === "FHA" && ltv > 80;
+  const convMiWarning    = loanType === "Conventional" && ltv > 80; // MI will apply
+  const convCashoutOver80 = loanType === "Conventional" && effectiveCashOut > 0 && ltv > 80; // cash-out not allowed
+  const convRateTermOver96 = loanType === "Conventional" && effectiveCashOut === 0 && ltv > 96; // rate/term over 96 not allowed
+
+  // ===== Top-of-input warnings block =====
+  const TopWarnings = () => (
+    <div className="space-y-2">
+      {/* Points threshold exceeded */}
+      {pointsTooHigh && (
+        <div className="rounded-xl border p-3 bg-red-50 text-red-700">
+          <h4 className="font-semibold">Total points exceed 4.75%</h4>
+          <p className="text-xs mt-1">Reduce Cost on UWM or Branch Gen to ≤ 4.75% combined or you may trigger a backend cost fail.</p>
+        </div>
+      )}
+
+      {/* Program/LTV rules */}
+      {loanType === "FHA" && fhaLtvImpossible && (
+        <div className="rounded-xl border p-3 bg-red-50 text-red-700">
+          <h4 className="font-semibold">FHA LTV exceeds 80%</h4>
+          <p className="text-xs mt-1">This scenario is not possible under FHA guidelines.</p>
+        </div>
+      )}
+      {loanType === "Conventional" && convRateTermOver96 && (
+        <div className="rounded-xl border p-3 bg-red-50 text-red-700">
+          <h4 className="font-semibold">Conventional Rate/Term over 96% LTV</h4>
+          <p className="text-xs mt-1">We can’t do Rate &amp; Term refinances above 96% LTV.</p>
+        </div>
+      )}
+      {loanType === "Conventional" && convCashoutOver80 && (
+        <div className="rounded-xl border p-3 bg-red-50 text-red-700">
+          <h4 className="font-semibold">Conventional Cash‑Out over 80% LTV</h4>
+          <p className="text-xs mt-1">Cash‑out is not allowed above 80% LTV for Conventional loans.</p>
+        </div>
+      )}
+      {loanType === "Conventional" && convMiWarning && !convCashoutOver80 && (
+        <div className="rounded-xl border p-3 bg-amber-50 text-amber-800">
+          <h4 className="font-semibold">Conventional LTV over 80%</h4>
+          <p className="text-xs mt-1">Mortgage Insurance (MI) will be added. Cash‑out is not permitted above 80% LTV.</p>
+        </div>
+      )}
+
+      {/* Cash‑out entered but unclear consolidation intent */}
+      {showCashOutNoConsolWarning && (
+        <div className="rounded-xl border p-3 bg-amber-50 text-amber-800">
+          <h4 className="font-semibold">Cash‑out entered without consolidation details</h4>
+          <p className="text-xs mt-1">If this cash‑out is <strong>not</strong> for paying off debts, enable “Not consolidating debt.” Otherwise, add the debt amounts so we can estimate true monthly savings.</p>
+        </div>
+      )}
+
+      {/* Temp buydown disabled notice */}
+      {(twoOneDisabled || oneZeroDisabled) && (
+        <div className="rounded-xl border p-3 bg-amber-50 text-amber-800">
+          <h4 className="font-semibold">Temporary buydown disabled</h4>
+          <p className="text-xs mt-1">2/1 and 1/0 buydowns are disabled when Cash Out &gt; 0.</p>
+        </div>
+      )}
+
+      {/* General Points & BG Guidance (always helpful) */}
+      <div className="rounded-xl border p-3 bg-slate-50 text-slate-800">
+        <h4 className="font-semibold">Points & BG Guidance</h4>
+        <p className="text-xs mt-1">Keep total points (Cost on UWM + Branch Gen) ≤ <strong>4.75%</strong> to avoid backend cost fails. Avoid the bare minimum BG tier; if a cost fail occurs, you could slip from <strong>BG1</strong> to <strong>BG2</strong>, impacting compensation and pricing.</p>
+      </div>
+    </div>
+  );
+
   return (
     <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-      {/* ===== Inputs ===== */}
+      {/* ===== Inputs (warnings pinned to top) ===== */}
       <Card className="shadow-lg rounded-2xl p-4">
         <CardContent className="space-y-4">
           <h2 className="text-xl font-bold">Mortgage Calculator</h2>
+
+          {/* TOP WARNINGS */}
+          <TopWarnings />
+
+          {/* Borrower Name */}
+          <div>
+            <Label>Borrower Name</Label>
+            <Input type="text" placeholder="e.g., Jane Doe" value={borrowerName} onChange={(e) => setBorrowerName(e.target.value)} />
+          </div>
 
           {/* Borrower Goal */}
           <div>
             <Label>Borrower Goal</Label>
             <Input type="text" placeholder="e.g., Lower payment & pay off cards" value={goal} onChange={(e) => setGoal(e.target.value)} />
+          </div>
+
+          {/* Previous PITI (GLOBAL) */}
+          <div>
+            <Label>Previous Monthly PITI ($/mo)</Label>
+            <Input type="number" value={currentPITI} onChange={(e) => setCurrentPITI(e.target.value === "" ? "" : Number(e.target.value))} />
+            <p className="text-xs text-gray-600 mt-1">Used to compare savings vs the new payment, plus Year 1/2 buydown savings when applicable.</p>
           </div>
 
           {/* Loan Type + VA Exempt */}
@@ -247,7 +338,7 @@ export default function MortgageCalculator() {
             <div>
               <Label>Cash Out ($)</Label>
               <Input type="number" value={cashOut} onChange={(e) => setCashOut(e.target.value === "" ? "" : Number(e.target.value))} />
-              {/* NEW: Pure cash‑out toggle */}
+              {/* Pure cash‑out toggle */}
               {n(cashOut) > 0 && (
                 <div className="mt-2 flex items-center">
                   <Checkbox checked={pureCashOut} onCheckedChange={(v) => setPureCashOut(!!v)} />
@@ -282,23 +373,11 @@ export default function MortgageCalculator() {
             <Input type="number" value={titleFee} onChange={(e) => setTitleFee(e.target.value === "" ? "" : Number(e.target.value))} />
           </div>
 
-          {/* Warning when cash‑out present but no consolidation details and toggle not set */}
-          {showCashOutNoConsolWarning && (
-            <div className="mt-2 rounded-xl border p-3 bg-amber-50 text-amber-800">
-              <h4 className="font-semibold">Cash‑out entered without consolidation details</h4>
-              <p className="text-xs mt-1">If this cash‑out is <strong>not</strong> for paying off debts, please enable “Not consolidating debt” above. Otherwise, add the debt amounts below so we can estimate true monthly savings.</p>
-            </div>
-          )}
-
           {/* Debt Consolidation (shown only when cash‑out and NOT pure cash‑out) */}
           {effectiveCashOut > 0 && !pureCashOut && (
             <div className="rounded-xl border p-3 mt-2 space-y-2">
               <Label className="font-semibold">Debt Consolidation</Label>
-              <div>
-                <Label>Current PITI ($/mo)</Label>
-                <Input type="number" value={currentPITI} onChange={(e) => setCurrentPITI(e.target.value === "" ? "" : Number(e.target.value))} />
-                <p className="text-xs text-gray-600 mt-1">Used with your current monthly debt payments to estimate total monthly savings.</p>
-              </div>
+              {/* NOTE: NO PITI FIELD HERE — we use the global Previous PITI above */}
               <div>
                 <Label>Total Debt Being Paid Off ($)</Label>
                 <Input type="number" value={debtPaid} onChange={(e) => setDebtPaid(e.target.value === "" ? "" : Number(e.target.value))} />
@@ -306,13 +385,14 @@ export default function MortgageCalculator() {
               <div>
                 <Label>Current Monthly Payments on That Debt ($/mo)</Label>
                 <Input type="number" value={debtMonthly} onChange={(e) => setDebtMonthly(e.target.value === "" ? "" : Number(e.target.value))} />
+                <p className="text-xs text-gray-600 mt-1">Debt-consolidation savings compare (Prev PITI + these monthly payments) vs the new PITI.</p>
               </div>
             </div>
           )}
 
           {/* Cost on UWM */}
           <div>
-            <Label>Rate Cost from Lender (%)</Label>
+            <Label>Cost on UWM (%)</Label>
             <Input type="number" step="0.01" value={uwmPoints} onChange={(e) => setUwmPoints(e.target.value === "" ? "" : Number(e.target.value))} />
           </div>
 
@@ -326,15 +406,9 @@ export default function MortgageCalculator() {
             </div>
           </div>
 
-          {/* ⚠️ Points & BG Disclaimer */}
-          <div className="mt-2 rounded-xl border p-3 bg-amber-50 text-amber-800">
-            <h4 className="font-semibold">Points & BG Disclaimer</h4>
-            <p className="text-xs mt-1">Do not exceed <strong>4.75%</strong> total points (Rate Cost from Lender + Branch Gen). Exceeding this may cause a backend cost fail. Also, avoid using the bare minimum BG tier — if a cost fail occurs, you could slip from <strong>BG1</strong> to <strong>BG2</strong>, impacting compensation and pricing.</p>
-          </div>
-
           {/* Interest Rate */}
           <div>
-            <Label>Interest Rate (%) <span className="text-xs text-gray-500">(This is the NEW rate chosen on the rate sheet)</span></Label>
+            <Label>Interest Rate (%) <span className="text-xs text-gray-500">(NEW rate chosen on rate sheet)</span></Label>
             <Input type="number" step="0.001" value={interestRate} onChange={(e) => setInterestRate(e.target.value === "" ? "" : Number(e.target.value))} />
           </div>
 
@@ -366,7 +440,6 @@ export default function MortgageCalculator() {
                   <span className={`ml-2 ${oneZeroDisabled ? "text-gray-400" : ""}`}>1/0 Buydown (Y1 -1%)</span>
                 </div>
               </div>
-              {(twoOneDisabled || oneZeroDisabled) && (<p className="text-xs text-amber-600">2/1 and 1/0 buydowns are disabled when Cash Out &gt; 0.</p>)}
               <p className="text-xs text-gray-600">Subsidy cost is estimated using the pre‑subsidy financed amount and then financed into the loan.</p>
             </div>
           )}
@@ -378,18 +451,27 @@ export default function MortgageCalculator() {
         <CardContent className="space-y-4">
           <h2 className="text-xl font-bold">Results</h2>
 
-          {goal && (
+          {/* Loan Type at Top of Output */}
+          <div className="rounded-2xl border p-3 bg-indigo-50 text-indigo-900">
+            <div className="text-xs uppercase tracking-wide">Loan Type</div>
+            <div className="text-lg font-semibold">{loanType}</div>
+          </div>
+
+          {(borrowerName || goal) && (
             <div className="rounded-xl bg-slate-50 border p-3">
-              <h3 className="font-semibold">Borrower Goal</h3>
-              <p className="text-sm">{goal}</p>
+              <h3 className="font-semibold">{borrowerName ? `${borrowerName}'s Goal` : "Borrower Goal"}</h3>
+              <p className="text-sm">{goal || "—"}</p>
             </div>
           )}
 
           <div className="space-y-1">
             <h3 className="font-semibold">Loan & Cost Breakdown</h3>
             <p><strong>Base Loan (Before Points):</strong> ${fmt(baseLoanWithGovFee)}</p>
-            <p><strong>{feeLabel}:</strong> ${fmt(feeAmount)}</p>
-            <p><strong>Total Points Used:</strong> {totalPointsForCalc.toFixed(2)}% {pointsWereCapped && <span className="text-red-600">(capped)</span>}</p>
+            {/* Show fee line for FHA/VA/IRRRL only; hide entirely for Conventional and also hide when $0 */}
+            {loanType !== "Conventional" && n(feeAmount) > 0 && (
+              <p><strong>{feeLabel}:</strong> ${fmt(feeAmount)}</p>
+            )}
+            <p><strong>Total Points Entered:</strong> {totalPointsEntered.toFixed(2)}%</p>
             <p><strong>Points Cost:</strong> ${fmt(pointsCost)}</p>
             <p><strong>Escrow Prepaid:</strong> ${fmt(escrowCost)}</p>
             <p><strong>Underwriting (Bank + Title):</strong> ${fmt(n(bankFee) + n(titleFee))}</p>
@@ -413,40 +495,40 @@ export default function MortgageCalculator() {
             <p className="text-lg font-bold text-green-600"><strong>Total Monthly Payment (New PITI):</strong> ${fmt(basePITI)}</p>
           </div>
 
-          {showTempBuydown && (
-            <div className="space-y-1">
-              <h3 className="font-semibold">Temporary Buydown Preview</h3>
-              {twoOneBuydown && (
-                <>
-                  <p><strong>Year 1 PITI (Rate {Math.max(0, y1RatePct).toFixed(3)}%):</strong> ${fmt(y1PITI)}</p>
-                  <p><strong>Year 2 PITI (Rate {Math.max(0, y2RatePct).toFixed(3)}%):</strong> ${fmt(y2PITI)}</p>
-                  <p><strong>Final PITI (Rate {n(interestRate).toFixed(3)}%):</strong> ${fmt(basePITI)}</p>
-                </>
-              )}
-              {oneZeroBuydown && (
-                <>
-                  <p><strong>Year 1 PITI (Rate {Math.max(0, y1RatePct).toFixed(3)}%):</strong> ${fmt(y1PITI)}</p>
-                  <p><strong>Final PITI (Rate {n(interestRate).toFixed(3)}%):</strong> ${fmt(basePITI)}</p>
-                </>
-              )}
-            </div>
-          )}
+          {/* Savings vs Previous (GLOBAL) */}
+          <div className="space-y-1">
+            <h3 className="font-semibold">Savings vs Previous</h3>
+            <p><strong>Previous PITI:</strong> ${fmt(prevPITI)}</p>
+            <p className="text-green-600"><strong>Monthly Savings (Base vs Previous):</strong> ${fmt(savingsVsPrev)}</p>
+            {showTempBuydown && (
+              <>
+                {twoOneBuydown && (
+                  <>
+                    <p><strong>Year 1 PITI:</strong> ${fmt(y1PITI)} — <span className="text-green-600">Saves ${fmt(savingsY1VsPrev)} vs previous</span></p>
+                    <p><strong>Year 2 PITI:</strong> ${fmt(y2PITI)} — <span className="text-green-600">Saves ${fmt(savingsY2VsPrev)} vs previous</span></p>
+                  </>
+                )}
+                {oneZeroBuydown && (
+                  <p><strong>Year 1 PITI:</strong> ${fmt(y1PITI)} — <span className="text-green-600">Saves ${fmt(savingsY1VsPrev)} vs previous</span></p>
+                )}
+              </>
+            )}
+          </div>
 
-          {/* 🔼 Debt Consolidation Summary ABOVE Compensation (when consolidating) */}
+          {/* Debt Consolidation Summary */}
           {isConsolidating && (
             <div className="space-y-1 mt-3">
               <h3 className="font-semibold">Debt Consolidation Summary</h3>
-              <p><strong>Current PITI:</strong> ${fmt(n(currentPITI))}/mo</p>
               <p><strong>They currently pay on their debt:</strong> ${fmt(n(debtMonthly))}/mo</p>
               <p><strong>Debt Being Paid Off:</strong> ${fmt(debtPaidApplied)}</p>
               <p><strong>Cash to Borrower After Debts:</strong> ${fmt(cashToBorrower)}</p>
-              <p className="text-green-600"><strong>Est. Monthly Savings (Total):</strong> ${fmt(estimatedTotalMonthlySavings)}</p>
-              <p className="text-xs text-gray-500">Savings compares your current PITI plus current monthly debt payments versus the new mortgage PITI. (Escrow/MI structure changes are reflected in the new PITI.)</p>
-              <p className="text-xs text-gray-500">For reference, PI‑only savings from consolidating the specified debts is estimated at ${fmt(monthlySavingsFromConsolidation)}.</p>
+              <p><strong>Total Previous Outflow (PITI + Debts):</strong> ${fmt(dcTotalPrevOutflow)}</p>
+              <p className="text-green-600"><strong>Total Monthly Savings vs NEW PITI:</strong> ${fmt(dcMonthlySavings)}</p>
+              <p className="text-xs text-gray-500">Savings = (Previous PITI + previous monthly debt payments) − NEW PITI. PI-only savings are intentionally NOT shown.</p>
             </div>
           )}
 
-          {/* NEW: Cash‑Out (No Debt Consolidation) Summary */}
+          {/* Cash‑Out (No Debt Consolidation) Summary */}
           {effectiveCashOut > 0 && !isConsolidating && (
             <div className="space-y-1 mt-3">
               <h3 className="font-semibold">Cash‑Out Summary (No Debt Consolidation)</h3>
@@ -467,3 +549,5 @@ export default function MortgageCalculator() {
     </div>
   );
 }
+
+
