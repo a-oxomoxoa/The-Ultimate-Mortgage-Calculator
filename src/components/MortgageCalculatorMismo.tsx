@@ -7,26 +7,14 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 
 /**
- * Ultimate Mortgage Calculator — FULL RECODE (Sep 7, 2025)
+ * Ultimate Mortgage Calculator — FULL RECODE w/ Term in Loan Type (Sep 7, 2025)
  *
- * Indigo-forward, dark-mode-only UI. This is a fresh file (not an edit of your previous canvas).
- *
- * Changes per request:
- * - Input text is white for better contrast.
- * - Removed light/dark mode toggle (dark theme only).
- * - Removed the large "Results" bubble header.
- * - Removed the top banner; a simple title line is used instead.
- *
- * Core rules retained:
- * - Do NOT display a Funding Fee line for **Conventional** loans (not even $0).
- * - FHA shows UFMIP when applicable; VA/IRRRL show Funding Fee only when > $0 and not exempt.
- * - Warnings live at the top of the INPUT column (LTV & program rules, points > 4.75%).
- * - Global Previous PITI input used for all savings calcs.
- * - Debt consolidation savings = (Prev PITI + previous monthly debt payments) − NEW PITI. No PI-only savings anywhere.
- * - Temp buydowns (2/1, 1/0) are Conventional-only and disabled when Cash Out > 0. Subsidy is financed.
+ * Fresh file built from scratch per request. Inputs remain unchanged from the prior build.
+ * The only UI change: the Loan Type output now appends the term, e.g.,
+ * "Conventional — 30 year".
  */
 
-export default function MortgageCalculatorIndigoDark() {
+export default function MortgageCalculatorIndigoDark_TermInType() {
   // ===== Inputs =====
   const [borrowerName, setBorrowerName] = useState<string>("");
   const [goal, setGoal] = useState<string>("");
@@ -286,6 +274,9 @@ export default function MortgageCalculatorIndigoDark() {
   const inputCls = "mt-1 bg-slate-950 border-slate-700 text-white placeholder-slate-400";
   const selectCls = "mt-1 border rounded-xl p-2.5 w-full bg-slate-950 border-slate-700 text-white";
 
+  // helper to format the term label ("30 year" vs "15 year")
+  const termLabel = `${n(termYears)} year`;
+
   return (
     <div className="dark">
       <div className="min-h-dvh bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100">
@@ -466,10 +457,10 @@ export default function MortgageCalculatorIndigoDark() {
           {/* ===== Results ===== */}
           <Card className="rounded-2xl border-slate-800 bg-slate-900/60 shadow-xl">
             <CardContent className="space-y-5 p-5">
-              {/* Loan Type at Top of Output (no bubble header) */}
+              {/* Loan Type at Top of Output (now includes term) */}
               <div className="rounded-2xl border border-indigo-500/30 p-3 bg-indigo-950/40">
                 <div className="text-xs uppercase tracking-wide text-indigo-300">Loan Type</div>
-                <div className="text-lg font-semibold text-indigo-100">{loanType}</div>
+                <div className="text-lg font-semibold text-indigo-100">{loanType} — {termLabel}</div>
               </div>
 
               {(borrowerName || goal) && (
@@ -572,12 +563,13 @@ export default function MortgageCalculatorIndigoDark() {
 
         {/* Footer */}
         <footer className="py-6 text-center text-xs text-slate-500">
-          Built fresh with an indigo dark vibe. No conventional funding fee line is ever shown.
+          Built fresh with an indigo dark vibe. Conventional loans never show a Funding Fee line.
         </footer>
       </div>
     </div>
   );
 }
+
 
 
 
