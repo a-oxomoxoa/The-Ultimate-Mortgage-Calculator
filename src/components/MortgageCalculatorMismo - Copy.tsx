@@ -1,21 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Switch } from "@/components/ui/switch";
 import Image from "next/image";
 
 /**
  * Ultimate Mortgage Calculator — Vercel-safe recode
- * - Removes all `any` casts
- * - Ensures no unused variables (uses `pointsTooHigh` in JSX)
- * - Keeps your existing UI/logic from the latest upload
+ * -----------------------------------------------
+ * • Pure client component, no server-only APIs
+ * • No implicit Node APIs — works on Vercel edge or Node runtimes
+ * • Strong typing, no `any` casts
+ * • No unused vars (keeps pointsTooHigh in JSX)
+ * • No default magic numbers for VA IRRRL text/fees
+ * • All recent feature requests baked in (Borrower View, term+rate chip, etc.)
  */
 
-// Tailwind theme map
+// Tailwind theme map (no external UI deps required)
 const INDIGO_THEME: Record<string, {
   sectionTitleText: string;
   headerWrap: string;
@@ -51,7 +50,7 @@ const INDIGO_THEME: Record<string, {
 // Explicit union type for the theme selector
 export type IndigoShade = "300" | "400" | "500" | "600";
 
-export default function MortgageCalculator_Final_v5() {
+export default function MortgageCalculatorPage() {
   // ===== Theme =====
   const [indigoShade, setIndigoShade] = useState<IndigoShade>("500");
   const t = INDIGO_THEME[indigoShade];
@@ -89,7 +88,7 @@ export default function MortgageCalculator_Final_v5() {
   const [twoOneBuydown, setTwoOneBuydown] = useState(false);
   const [oneZeroBuydown, setOneZeroBuydown] = useState(false);
 
-  // Borrower View (TRUE = hide compensation & base-loan)
+  // Borrower View (TRUE = hide compensation & base-loan & points percent)
   const [borrowerView, setBorrowerView] = useState(false);
 
   // ===== Constants =====
@@ -238,7 +237,7 @@ export default function MortgageCalculator_Final_v5() {
     </div>
   );
 
-  const inputCls = "mt-1 bg-slate-950 border-slate-700 text-white placeholder-slate-400";
+  const inputCls = "mt-1 bg-slate-950 border-slate-700 text-white placeholder-slate-400 rounded-xl px-3 py-2.5 w-full";
   const selectCls = "mt-1 border rounded-xl p-2.5 w-full bg-slate-950 border-slate-700 text-white";
 
   // ORDERING for cost breakdown (Base Loan only when Borrower View is OFF)
@@ -288,7 +287,7 @@ export default function MortgageCalculator_Final_v5() {
 
           {/* Theme Picker */}
           <div className="flex items-center gap-2">
-            <Label className="text-slate-300">Indigo Shade</Label>
+            <label className="text-slate-300">Indigo Shade</label>
             <select
               className="ml-2 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100"
               value={indigoShade}
@@ -305,318 +304,318 @@ export default function MortgageCalculator_Final_v5() {
         {/* Two-column grid where each column controls its own height */}
         <main className="mx-auto max-w-7xl px-4 pb-8 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
           {/* ===== Left: Inputs ===== */}
-          <Card className="rounded-2xl border-slate-800 bg-slate-900/60 shadow-xl">
-            <CardContent className="space-y-4 p-5">
-              {/* Alerts */}
-              <div className="space-y-2">
-                {pointsTooHigh && (
-                  <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-red-200">
-                    <h4 className="font-semibold">Total points exceed 4.75%</h4>
-                    <p className="text-xs mt-1">Reduce Cost From Lender or Branch Gen so combined ≤ 4.75%.</p>
-                  </div>
-                )}
-
-                {loanType === "FHA" && fhaLtvImpossible && (
-                  <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-red-200">
-                    <h4 className="font-semibold">FHA LTV exceeds 80%</h4>
-                    <p className="text-xs mt-1">This scenario isn’t possible under FHA guidelines.</p>
-                  </div>
-                )}
-
-                {loanType === "Conventional" && convRateTermOver96 && (
-                  <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-red-200">
-                    <h4 className="font-semibold">Rate/Term over 96% LTV</h4>
-                    <p className="text-xs mt-1">Conventional R/T isn’t allowed above 96% LTV.</p>
-                  </div>
-                )}
-
-                {loanType === "Conventional" && convCashoutOver80 && (
-                  <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-red-200">
-                    <h4 className="font-semibold">Cash-Out over 80% LTV</h4>
-                    <p className="text-xs mt-1">Conventional cash-out isn’t allowed above 80% LTV.</p>
-                  </div>
-                )}
-
-                {loanType === "Conventional" && convMiWarning && !convCashoutOver80 && (
-                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-amber-100">
-                    <h4 className="font-semibold">Conventional LTV over 80%</h4>
-                    <p className="text-xs mt-1">MI will be added. Cash-out not permitted above 80% LTV.</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Borrower & loan inputs */}
-              <div>
-                <Label className="text-slate-300">Borrower Name</Label>
-                <Input className={inputCls} type="text" value={borrowerName} onChange={(e) => setBorrowerName(e.target.value)} />
-              </div>
-
-              <div>
-                <Label className="text-slate-300">Borrower Goal</Label>
-                <Input className={inputCls} type="text" value={goal} onChange={(e) => setGoal(e.target.value)} />
-              </div>
-
-              <div>
-                <Label className="text-slate-300">Previous Monthly PITI ($/mo)</Label>
-                <Input className={inputCls} type="number" value={currentPITI}
-                  onChange={(e) => setCurrentPITI(e.target.value === "" ? "" : Number(e.target.value))} />
-              </div>
-
-              <div className="flex flex-col sm:flex-row sm:items-end gap-4">
-                <div className="flex-1">
-                  <Label className="text-slate-300">Loan Type</Label>
-                  <select className={selectCls} value={loanType} onChange={(e) => setLoanType(e.target.value)}>
-                    <option value="Conventional">Conventional</option>
-                    <option value="VA">VA</option>
-                    <option value="FHA">FHA</option>
-                    <option value="VA IRRRL">VA IRRRL</option>
-                  </select>
+          <section className="rounded-2xl border border-slate-800 bg-slate-900/60 shadow-xl p-5 space-y-4">
+            {/* Alerts */}
+            <div className="space-y-2">
+              {pointsTooHigh && (
+                <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-red-200">
+                  <h4 className="font-semibold">Total points exceed 4.75%</h4>
+                  <p className="text-xs mt-1">Reduce Cost From Lender or Branch Gen so combined ≤ 4.75%.</p>
                 </div>
-                {(loanType === "VA" || loanType === "VA IRRRL") && (
-                  <div className="flex items-center h-10 mt-1">
-                    <Checkbox checked={isFundingFeeExempt} onCheckedChange={(v) => setIsFundingFeeExempt(!!v)} />
-                    <Label className="ml-2 text-slate-300">Exempt from Funding Fee</Label>
-                  </div>
-                )}
-              </div>
+              )}
 
+              {loanType === "FHA" && fhaLtvImpossible && (
+                <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-red-200">
+                  <h4 className="font-semibold">FHA LTV exceeds 80%</h4>
+                  <p className="text-xs mt-1">This scenario isn’t possible under FHA guidelines.</p>
+                </div>
+              )}
+
+              {loanType === "Conventional" && convRateTermOver96 && (
+                <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-red-200">
+                  <h4 className="font-semibold">Rate/Term over 96% LTV</h4>
+                  <p className="text-xs mt-1">Conventional R/T isn’t allowed above 96% LTV.</p>
+                </div>
+              )}
+
+              {loanType === "Conventional" && convCashoutOver80 && (
+                <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-red-200">
+                  <h4 className="font-semibold">Cash-Out over 80% LTV</h4>
+                  <p className="text-xs mt-1">Conventional cash-out isn’t allowed above 80% LTV.</p>
+                </div>
+              )}
+
+              {loanType === "Conventional" && convMiWarning && !convCashoutOver80 && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-amber-100">
+                  <h4 className="font-semibold">Conventional LTV over 80%</h4>
+                  <p className="text-xs mt-1">MI will be added. Cash-out not permitted above 80% LTV.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Borrower & loan inputs */}
+            <div>
+              <label className="text-slate-300">Borrower Name</label>
+              <input className={inputCls} type="text" value={borrowerName} onChange={(e) => setBorrowerName(e.target.value)} />
+            </div>
+
+            <div>
+              <label className="text-slate-300">Borrower Goal</label>
+              <input className={inputCls} type="text" value={goal} onChange={(e) => setGoal(e.target.value)} />
+            </div>
+
+            <div>
+              <label className="text-slate-300">Previous Monthly PITI ($/mo)</label>
+              <input className={inputCls} type="number" value={currentPITI}
+                onChange={(e) => setCurrentPITI(e.target.value === "" ? "" : Number(e.target.value))} />
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-end gap-4">
+              <div className="flex-1">
+                <label className="text-slate-300">Loan Type</label>
+                <select className={selectCls} value={loanType} onChange={(e) => setLoanType(e.target.value)}>
+                  <option value="Conventional">Conventional</option>
+                  <option value="VA">VA</option>
+                  <option value="FHA">FHA</option>
+                  <option value="VA IRRRL">VA IRRRL</option>
+                </select>
+              </div>
+              {(loanType === "VA" || loanType === "VA IRRRL") && (
+                <div className="flex items-center h-10 mt-1">
+                  <input id="chk-exempt" type="checkbox" checked={isFundingFeeExempt} onChange={(e) => setIsFundingFeeExempt(e.target.checked)} />
+                  <label htmlFor="chk-exempt" className="ml-2 text-slate-300">Exempt from Funding Fee</label>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="text-slate-300">Appraised Value ($)</label>
+              <input className={inputCls} type="number" value={appraisedValue}
+                onChange={(e) => setAppraisedValue(e.target.value === "" ? "" : Number(e.target.value))} />
+            </div>
+
+            <div>
+              <label className="text-slate-300">Current Loan Balance ($)</label>
+              <input className={inputCls} type="number" value={balance}
+                onChange={(e) => setBalance(e.target.value === "" ? "" : Number(e.target.value))} />
+            </div>
+
+            {loanType !== "VA IRRRL" && (
               <div>
-                <Label className="text-slate-300">Appraised Value ($)</Label>
-                <Input className={inputCls} type="number" value={appraisedValue}
-                  onChange={(e) => setAppraisedValue(e.target.value === "" ? "" : Number(e.target.value))} />
+                <label className="text-slate-300">Cash Out ($)</label>
+                <input className={inputCls} type="number" value={cashOut}
+                  onChange={(e) => setCashOut(e.target.value === "" ? "" : Number(e.target.value))} />
               </div>
+            )}
 
-              <div>
-                <Label className="text-slate-300">Current Loan Balance ($)</Label>
-                <Input className={inputCls} type="number" value={balance}
-                  onChange={(e) => setBalance(e.target.value === "" ? "" : Number(e.target.value))} />
-              </div>
+            <div>
+              <label className="text-slate-300">Monthly Escrow ($)</label>
+              <input className={inputCls} type="number" value={monthlyEscrow}
+                onChange={(e) => setMonthlyEscrow(e.target.value === "" ? "" : Number(e.target.value))} />
+            </div>
 
-              {loanType !== "VA IRRRL" && (
+            <div>
+              <label className="text-slate-300">Escrow Months</label>
+              <input className={inputCls} type="number" value={escrowMonths}
+                onChange={(e) => setEscrowMonths(e.target.value === "" ? "" : Number(e.target.value))} />
+            </div>
+
+            <div>
+              <label className="text-slate-300">Underwriting ($)</label>
+              <input className={inputCls} type="number" value={bankFee}
+                onChange={(e) => setBankFee(e.target.value === "" ? "" : Number(e.target.value))} />
+            </div>
+
+            <div>
+              <label className="text-slate-300">Title Fee ($)</label>
+              <input className={inputCls} type="number" value={titleFee}
+                onChange={(e) => setTitleFee(e.target.value === "" ? "" : Number(e.target.value))} />
+            </div>
+
+            {/* Debt Consolidation (optional fields appear only when cash-out present) */}
+            {effectiveCashOut > 0 && (
+              <div className="rounded-2xl border border-slate-700 p-3 mt-2 space-y-2 bg-slate-900/60">
+                <label className="font-semibold text-slate-200">Debt Consolidation (optional)</label>
                 <div>
-                  <Label className="text-slate-300">Cash Out ($)</Label>
-                  <Input className={inputCls} type="number" value={cashOut}
-                    onChange={(e) => setCashOut(e.target.value === "" ? "" : Number(e.target.value))} />
+                  <label className="text-slate-300">Debt Being Paid Off ($)</label>
+                  <input className={inputCls} type="number" value={debtPaid}
+                    onChange={(e) => setDebtPaid(e.target.value === "" ? "" : Number(e.target.value))} />
                 </div>
-              )}
-
-              <div>
-                <Label className="text-slate-300">Monthly Escrow ($)</Label>
-                <Input className={inputCls} type="number" value={monthlyEscrow}
-                  onChange={(e) => setMonthlyEscrow(e.target.value === "" ? "" : Number(e.target.value))} />
-              </div>
-
-              <div>
-                <Label className="text-slate-300">Escrow Months</Label>
-                <Input className={inputCls} type="number" value={escrowMonths}
-                  onChange={(e) => setEscrowMonths(e.target.value === "" ? "" : Number(e.target.value))} />
-              </div>
-
-              <div>
-                <Label className="text-slate-300">Underwriting ($)</Label>
-                <Input className={inputCls} type="number" value={bankFee}
-                  onChange={(e) => setBankFee(e.target.value === "" ? "" : Number(e.target.value))} />
-              </div>
-
-              <div>
-                <Label className="text-slate-300">Title Fee ($)</Label>
-                <Input className={inputCls} type="number" value={titleFee}
-                  onChange={(e) => setTitleFee(e.target.value === "" ? "" : Number(e.target.value))} />
-              </div>
-
-              {/* Debt Consolidation (optional fields appear only when cash-out present) */}
-              {effectiveCashOut > 0 && (
-                <div className="rounded-2xl border border-slate-700 p-3 mt-2 space-y-2 bg-slate-900/60">
-                  <Label className="font-semibold text-slate-200">Debt Consolidation (optional)</Label>
-                  <div>
-                    <Label className="text-slate-300">Debt Being Paid Off ($)</Label>
-                    <Input className={inputCls} type="number" value={debtPaid}
-                      onChange={(e) => setDebtPaid(e.target.value === "" ? "" : Number(e.target.value))} />
-                  </div>
-                  <div>
-                    <Label className="text-slate-300">Current Monthly Payments on That Debt ($/mo)</Label>
-                    <Input className={inputCls} type="number" value={debtMonthly}
-                      onChange={(e) => setDebtMonthly(e.target.value === "" ? "" : Number(e.target.value))} />
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <Label className="text-slate-300">Cost From Lender(%)</Label>
-                <Input className={inputCls} type="number" step="0.01" value={uwmPoints}
-                  onChange={(e) => setUwmPoints(e.target.value === "" ? "" : Number(e.target.value))} />
-              </div>
-
-              <div>
-                <Label className="text-slate-300">Branch Gen (BG %)</Label>
-                <Input className={inputCls} type="number" step="0.01" value={branchGenPointsInput}
-                  onChange={(e) => setBranchGenPointsInput(e.target.value === "" ? "" : Number(e.target.value))} />
-                <div className="text-xs text-slate-400 mt-1">BG1: 2.25–3.00 • BG2: 1.50–2.25 • BG3: 0.75–1.50 • BG4: 0.74 and below</div>
-                <div className="text-xs text-amber-200 mt-1">
-                  Heads up: using bare-minimum points to hit a BG tier might cause you to slip into a lower BG due to a cost fail.
-                </div>
-                <div className="mt-3 flex justify-end items-center gap-2">
-                  <Label htmlFor="toggle-borrower" className="text-xs text-slate-300">Borrower View</Label>
-                  <Switch id="toggle-borrower" checked={borrowerView} onCheckedChange={(v) => setBorrowerView(!!v)} />
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-slate-300">Interest Rate (%)</Label>
-                <Input className={inputCls} type="number" step="0.001" value={interestRate}
-                  onChange={(e) => setInterestRate(e.target.value === "" ? "" : Number(e.target.value))} />
-              </div>
-
-              <div>
-                <Label className="text-slate-300">Term (Years)</Label>
-                <Input className={inputCls} type="number" value={termYears}
-                  onChange={(e) => setTermYears(e.target.value === "" ? "" : Number(e.target.value))} />
-              </div>
-
-              {loanType === "Conventional" && ltv > 80 && (
                 <div>
-                  <Label className="text-slate-300">Mortgage Insurance Rate (Annual %)</Label>
-                  <Input className={inputCls} type="number" step="0.001"
-                    value={(mortgageInsuranceRate * 100).toFixed(3)}
-                    onChange={(e) => setMortgageInsuranceRate(Number(e.target.value) / 100)} />
+                  <label className="text-slate-300">Current Monthly Payments on That Debt ($/mo)</label>
+                  <input className={inputCls} type="number" value={debtMonthly}
+                    onChange={(e) => setDebtMonthly(e.target.value === "" ? "" : Number(e.target.value))} />
                 </div>
-              )}
+              </div>
+            )}
 
-              {loanType === "Conventional" && (
-                <div className="mt-2 space-y-2">
-                  <Label className="font-semibold text-slate-200">Temporary Buydown (Conventional only)</Label>
-                  <div className="flex items-center gap-8">
-                    <div className="flex items-center gap-3">
-                      <Label htmlFor="switch-21" className={`text-sm ${twoOneDisabled ? "text-slate-500" : "text-slate-300"}`}>2/1 Buydown</Label>
-                      <Switch
-                        id="switch-21"
-                        disabled={twoOneDisabled}
-                        checked={twoOneBuydown && !twoOneDisabled}
-                        onCheckedChange={(v) => {
-                          if (!twoOneDisabled) {
-                            setTwoOneBuydown(!!v);
-                            if (v) setOneZeroBuydown(false);
-                          }
-                        }}
-                      />
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Label htmlFor="switch-10" className={`text-sm ${oneZeroDisabled ? "text-slate-500" : "text-slate-300"}`}>1/0 Buydown</Label>
-                      <Switch
-                        id="switch-10"
-                        disabled={oneZeroDisabled}
-                        checked={oneZeroBuydown && !oneZeroDisabled}
-                        onCheckedChange={(v) => {
-                          if (!oneZeroDisabled) {
-                            setOneZeroBuydown(!!v);
-                            if (v) setTwoOneBuydown(false);
-                          }
-                        }}
-                      />
-                    </div>
+            <div>
+              <label className="text-slate-300">Cost From Lender(%)</label>
+              <input className={inputCls} type="number" step="0.01" value={uwmPoints}
+                onChange={(e) => setUwmPoints(e.target.value === "" ? "" : Number(e.target.value))} />
+            </div>
+
+            <div>
+              <label className="text-slate-300">Branch Gen (BG %)</label>
+              <input className={inputCls} type="number" step="0.01" value={branchGenPointsInput}
+                onChange={(e) => setBranchGenPointsInput(e.target.value === "" ? "" : Number(e.target.value))} />
+              <div className="text-xs text-slate-400 mt-1">BG1: 2.25–3.00 • BG2: 1.50–2.25 • BG3: 0.75–1.50 • BG4: 0.74 and below</div>
+              <div className="text-xs text-amber-200 mt-1">
+                Heads up: using bare-minimum points to hit a BG tier might cause you to slip into a lower BG due to a cost fail.
+              </div>
+              <div className="mt-3 flex justify-end items-center gap-2">
+                <label htmlFor="toggle-borrower" className="text-xs text-slate-300">Borrower View</label>
+                <input id="toggle-borrower" type="checkbox" checked={borrowerView} onChange={(e) => setBorrowerView(e.target.checked)} />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-slate-300">Interest Rate (%)</label>
+              <input className={inputCls} type="number" step="0.001" value={interestRate}
+                onChange={(e) => setInterestRate(e.target.value === "" ? "" : Number(e.target.value))} />
+            </div>
+
+            <div>
+              <label className="text-slate-300">Term (Years)</label>
+              <input className={inputCls} type="number" value={termYears}
+                onChange={(e) => setTermYears(e.target.value === "" ? "" : Number(e.target.value))} />
+            </div>
+
+            {loanType === "Conventional" && ltv > 80 && (
+              <div>
+                <label className="text-slate-300">Mortgage Insurance Rate (Annual %)</label>
+                <input className={inputCls} type="number" step="0.001"
+                  value={(mortgageInsuranceRate * 100).toFixed(3)}
+                  onChange={(e) => setMortgageInsuranceRate(Number(e.target.value) / 100)} />
+              </div>
+            )}
+
+            {loanType === "Conventional" && (
+              <div className="mt-2 space-y-2">
+                <label className="font-semibold text-slate-200">Temporary Buydown (Conventional only)</label>
+                <div className="flex items-center gap-8">
+                  <div className="flex items-center gap-3">
+                    <label htmlFor="switch-21" className={`text-sm ${twoOneDisabled ? "text-slate-500" : "text-slate-300"}`}>2/1 Buydown</label>
+                    <input
+                      id="switch-21"
+                      type="checkbox"
+                      disabled={twoOneDisabled}
+                      checked={twoOneBuydown && !twoOneDisabled}
+                      onChange={(e) => {
+                        const v = e.target.checked;
+                        if (!twoOneDisabled) {
+                          setTwoOneBuydown(v);
+                          if (v) setOneZeroBuydown(false);
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <label htmlFor="switch-10" className={`text-sm ${oneZeroDisabled ? "text-slate-500" : "text-slate-300"}`}>1/0 Buydown</label>
+                    <input
+                      id="switch-10"
+                      type="checkbox"
+                      disabled={oneZeroDisabled}
+                      checked={oneZeroBuydown && !oneZeroDisabled}
+                      onChange={(e) => {
+                        const v = e.target.checked;
+                        if (!oneZeroDisabled) {
+                          setOneZeroBuydown(v);
+                          if (v) setTwoOneBuydown(false);
+                        }
+                      }}
+                    />
                   </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </div>
+            )}
+          </section>
 
           {/* ===== Right: Results ===== */}
-          <Card className="self-start rounded-2xl border-slate-800 bg-slate-900/60 shadow-xl flex flex-col">
-            <CardContent className="space-y-5 p-5">
-              {/* Header chip with loan type, term, and interest rate */}
-              <div className={`rounded-2xl border p-3 ${t.headerWrap}`}>
-                <div className={`text-xs uppercase tracking-wide ${t.accentTitleText}`}>Loan Type</div>
-                <div className="text-lg font-semibold text-indigo-100">{loanType} — {termLabel}{rateLabel}</div>
-              </div>
+          <section className="self-start rounded-2xl border border-slate-800 bg-slate-900/60 shadow-xl p-5 space-y-5 flex flex-col">
+            {/* Header chip with loan type, term, and interest rate */}
+            <div className={`rounded-2xl border p-3 ${t.headerWrap}`}>
+              <div className={`text-xs uppercase tracking-wide ${t.accentTitleText}`}>Loan Type</div>
+              <div className="text-lg font-semibold text-indigo-100">{loanType} — {termLabel}{rateLabel}</div>
+            </div>
 
-              {(borrowerName || goal) && (
-                <div className="rounded-2xl bg-slate-950 border border-slate-800 p-3">
-                  <h3 className="font-semibold text-slate-200">{borrowerName ? `${borrowerName}'s Goal` : "Borrower Goal"}</h3>
-                  <p className="text-sm text-slate-300">{goal || "—"}</p>
-                </div>
+            {(borrowerName || goal) && (
+              <div className="rounded-2xl bg-slate-950 border border-slate-800 p-3">
+                <h3 className="font-semibold text-slate-200">{borrowerName ? `${borrowerName}'s Goal` : "Borrower Goal"}</h3>
+                <p className="text-sm text-slate-300">{goal || "—"}</p>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <SectionTitle>Loan & Cost Breakdown</SectionTitle>
+              <div className="grid grid-cols-2 gap-3">
+                {loanCostItemsVisible.map((it) => (
+                  <div key={it.key}>{it.node}</div>
+                ))}
+              </div>
+              {showTempBuydown && (
+                <p className="text-xs text-slate-400">Year 1 diff: ${fmt(diffY1)}{twoOneBuydown ? ` • Year 2 diff: $${fmt(diffY2)}` : ""}</p>
               )}
+            </div>
 
-              <div className="space-y-3">
-                <SectionTitle>Loan & Cost Breakdown</SectionTitle>
-                <div className="grid grid-cols-2 gap-3">
-                  {loanCostItemsVisible.map((it) => (
-                    <div key={it.key}>{it.node}</div>
-                  ))}
-                </div>
-                {showTempBuydown && (
-                  <p className="text-xs text-slate-400">Year 1 diff: ${fmt(diffY1)}{twoOneBuydown ? ` • Year 2 diff: $${fmt(diffY2)}` : ""}</p>
-                )}
+            <div className="space-y-3">
+              <SectionTitle>Monthly PITI Breakdown</SectionTitle>
+              <div className="grid grid-cols-2 gap-3">
+                <StatBox label="Principal & Interest" value={`$${fmt(PI)}`} />
+                <StatBox label="Escrow" value={`$${fmt(n(monthlyEscrow))}`} />
+                {loanType === "FHA" && <StatBox label="MIP" value={`$${fmt(mipMonthly)}`} />}
+                {loanType === "Conventional" && ltv > 80 && <StatBox label="Mortgage Insurance" value={`$${fmt(miMonthly)}`} />}
+                <StatBox label="Total Monthly Payment (New PITI)" value={`$${fmt(basePITI)}`} accent />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <SectionTitle>Savings vs Previous</SectionTitle>
+              <div className="grid grid-cols-2 gap-3">
+                <StatBox label="Previous PITI" value={`$${fmt(prevPITI)}`} />
+                <StatBox label="Monthly Savings (Base vs Previous)" value={`$${fmt(savingsVsPrev)}`} accent />
               </div>
 
-              <div className="space-y-3">
-                <SectionTitle>Monthly PITI Breakdown</SectionTitle>
+              {showTempBuydown && (
                 <div className="grid grid-cols-2 gap-3">
-                  <StatBox label="Principal & Interest" value={`$${fmt(PI)}`} />
-                  <StatBox label="Escrow" value={`$${fmt(n(monthlyEscrow))}`} />
-                  {loanType === "FHA" && <StatBox label="MIP" value={`$${fmt(mipMonthly)}`} />}
-                  {loanType === "Conventional" && ltv > 80 && <StatBox label="Mortgage Insurance" value={`$${fmt(miMonthly)}`} />}
-                  <StatBox label="Total Monthly Payment (New PITI)" value={`$${fmt(basePITI)}`} accent />
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <SectionTitle>Savings vs Previous</SectionTitle>
-                <div className="grid grid-cols-2 gap-3">
-                  <StatBox label="Previous PITI" value={`$${fmt(prevPITI)}`} />
-                  <StatBox label="Monthly Savings (Base vs Previous)" value={`$${fmt(savingsVsPrev)}`} accent />
-                </div>
-
-                {showTempBuydown && (
-                  <div className="grid grid-cols-2 gap-3">
-                    {twoOneBuydown && (
-                      <>
-                        <StatBox label="Year 1 PITI (vs Prev)" value={`$${fmt(y1PITI)} · saves $${fmt(savingsY1VsPrev)}`} />
-                        <StatBox label="Year 2 PITI (vs Prev)" value={`$${fmt(y2PITI)} · saves $${fmt(savingsY2VsPrev)}`} />
-                      </>
-                    )}
-                    {oneZeroBuydown && (
+                  {twoOneBuydown && (
+                    <>
                       <StatBox label="Year 1 PITI (vs Prev)" value={`$${fmt(y1PITI)} · saves $${fmt(savingsY1VsPrev)}`} />
-                    )}
-                  </div>
-                )}
+                      <StatBox label="Year 2 PITI (vs Prev)" value={`$${fmt(y2PITI)} · saves $${fmt(savingsY2VsPrev)}`} />
+                    </>
+                  )}
+                  {oneZeroBuydown && (
+                    <StatBox label="Year 1 PITI (vs Prev)" value={`$${fmt(y1PITI)} · saves $${fmt(savingsY1VsPrev)}`} />
+                  )}
+                </div>
+              )}
+            </div>
+
+            {isConsolidating && (
+              <div className="space-y-3">
+                <SectionTitle>Debt Consolidation Summary</SectionTitle>
+                <div className="grid grid-cols-2 gap-3">
+                  <StatBox label="They currently pay on their debt" value={`$${fmt(n(debtMonthly))}/mo`} />
+                  <StatBox label="Debt Being Paid Off" value={`$${fmt(debtPaidApplied)}`} />
+                  <StatBox label="Cash to Borrower After Debts" value={`$${fmt(cashToBorrower)}`} />
+                  <StatBox label="Total Previous Outflow" value={`$${fmt(prevPITI + n(debtMonthly))}`} />
+                  <StatBox label="Total Monthly Savings vs NEW PITI" value={`$${fmt(Math.max(0, prevPITI + n(debtMonthly) - basePITI))}`} accent />
+                </div>
               </div>
+            )}
 
-              {isConsolidating && (
-                <div className="space-y-3">
-                  <SectionTitle>Debt Consolidation Summary</SectionTitle>
-                  <div className="grid grid-cols-2 gap-3">
-                    <StatBox label="They currently pay on their debt" value={`$${fmt(n(debtMonthly))}/mo`} />
-                    <StatBox label="Debt Being Paid Off" value={`$${fmt(debtPaidApplied)}`} />
-                    <StatBox label="Cash to Borrower After Debts" value={`$${fmt(cashToBorrower)}`} />
-                    <StatBox label="Total Previous Outflow" value={`$${fmt(prevPITI + n(debtMonthly))}`} />
-                    <StatBox label="Total Monthly Savings vs NEW PITI" value={`$${fmt(Math.max(0, prevPITI + n(debtMonthly) - basePITI))}`} accent />
-                  </div>
+            {effectiveCashOut > 0 && !isConsolidating && (
+              <div className="space-y-3">
+                <SectionTitle>Cash-Out Summary</SectionTitle>
+                <div className="grid grid-cols-2 gap-3">
+                  <StatBox label="Cash to Borrower" value={`$${fmt(cashToBorrower)}`} accent />
                 </div>
-              )}
+              </div>
+            )}
 
-              {effectiveCashOut > 0 && !isConsolidating && (
-                <div className="space-y-3">
-                  <SectionTitle>Cash-Out Summary</SectionTitle>
-                  <div className="grid grid-cols-2 gap-3">
-                    <StatBox label="Cash to Borrower" value={`$${fmt(cashToBorrower)}`} accent />
-                  </div>
+            {!borrowerView && (
+              <div className="space-y-3">
+                <SectionTitle>Compensation</SectionTitle>
+                <div className="grid grid-cols-2 gap-3">
+                  <StatBox label="Inferred BG Tier" value={`${deriveBgTier(n(branchGenPointsInput))}`} />
+                  <StatBox label="Loan Officer" value={`${loCompBps} bps → $${fmt(loCompensation)}`} />
+                  <StatBox label="Associate" value={`${loaCompBps} bps → $${fmt(loaCompensation)}`} />
                 </div>
-              )}
-
-              {!borrowerView && (
-                <div className="space-y-3">
-                  <SectionTitle>Compensation</SectionTitle>
-                  <div className="grid grid-cols-2 gap-3">
-                    <StatBox label="Inferred BG Tier" value={`${deriveBgTier(n(branchGenPointsInput))}`} />
-                    <StatBox label="Loan Officer" value={`${loCompBps} bps → $${fmt(loCompensation)}`} />
-                    <StatBox label="Associate" value={`${loaCompBps} bps → $${fmt(loaCompensation)}`} />
-                  </div>
-                </div>
-              )}
-            </CardContent>
+              </div>
+            )}
 
             {/* Footer */}
-            <CardFooter className="mt-6 justify-center py-5">
+            <div className="mt-6 flex justify-center py-5">
               <Image
                 src="/Extreme-Loans-Logo-White.webp"
                 alt="Extreme Loans Logo"
@@ -625,8 +624,8 @@ export default function MortgageCalculator_Final_v5() {
                 className="opacity-90"
                 priority
               />
-            </CardFooter>
-          </Card>
+            </div>
+          </section>
         </main>
       </div>
     </div>
