@@ -54,12 +54,9 @@ const INDIGO_THEME: Record<string, {
   },
 };
 
-// Explicit union type for the theme selector
-export type IndigoShade = "300" | "400" | "500" | "600";
-
 export default function MortgageCalculator_Final_v5() {
   // ===== Theme =====
-  const [indigoShade, setIndigoShade] = useState<IndigoShade>("500");
+  const [indigoShade, setIndigoShade] = useState<"300" | "400" | "500" | "600">("500");
   const t = INDIGO_THEME[indigoShade];
 
   // ===== Inputs =====
@@ -301,7 +298,7 @@ export default function MortgageCalculator_Final_v5() {
             <select
               className="ml-2 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100"
               value={indigoShade}
-              onChange={(e) => setIndigoShade(e.target.value as IndigoShade)}
+              onChange={(e) => setIndigoShade(e.target.value as any)}
             >
               <option value="300">300 (lighter)</option>
               <option value="400">400</option>
@@ -318,7 +315,7 @@ export default function MortgageCalculator_Final_v5() {
             <CardContent className="space-y-4 p-5">
               {/* Alerts */}
               <div className="space-y-2">
-                {pointsTooHigh && (
+                {totalPointsEntered > TOTAL_POINTS_ALERT && (
                   <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-red-200">
                     <h4 className="font-semibold">Total points exceed 4.75%</h4>
                     <p className="text-xs mt-1">Reduce Cost From Lender or Branch Gen so combined ≤ 4.75%.</p>
