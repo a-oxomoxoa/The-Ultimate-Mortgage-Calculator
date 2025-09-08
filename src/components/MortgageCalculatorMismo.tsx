@@ -235,7 +235,7 @@ export default function MortgageCalculator_Final_v5() {
   const convRateTermOver96 = loanType === "Conventional" && effectiveCashOut === 0 && ltv > 96;
 
   // ===== UI helpers =====
-  const SectionTitle = ({ children }: { children: React.ReactNode }) => (
+  const SectionTitle = ({ children }: { children: ReactNode }) => (
     <h3 className={`text-sm font-semibold tracking-wide uppercase ${t.sectionTitleText}`}>{children}</h3>
   );
 
