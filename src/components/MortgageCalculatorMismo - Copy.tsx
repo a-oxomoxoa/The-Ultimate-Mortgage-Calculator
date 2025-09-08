@@ -5,7 +5,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import Image from "next/image";
 
 /**
  * Ultimate Mortgage Calculator — FULL RECODE w/ Term in Loan Type (Sep 7, 2025)
@@ -561,18 +560,6 @@ export default function MortgageCalculatorIndigoDark_TermInType() {
             </CardContent>
           </Card>
         </main>
-
-        {/* Logo at the bottom */}
-        <footer className="py-6 flex justify-center">
-          <Image
-            src="/Extreme-Loans-Logo-White.webp"
-            alt="Extreme Loans Logo"
-            width={220}
-            height={80}
-            className="opacity-90"
-          />
-        </footer>
-
 
       </div>
     </div>
