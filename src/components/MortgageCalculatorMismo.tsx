@@ -9,16 +9,10 @@ import { Switch } from "@/components/ui/switch";
 import Image from "next/image";
 
 /**
- * Ultimate Mortgage Calculator — Final Recode v5
- *
- * Changes from v4 (per Tim):
- * - Removed the automatic defaults for Underwriting to $2350 / $1500 (VA IRRRL). Field now starts blank and never auto-switches.
- * - Added a yellowish warning under the Branch Gen breakdown about potential cost fail when using bare-minimum points to hit a BG tier.
- *
- * Kept from v4:
- * - "Borrower View" hides compensation and the Base Loan (Before Points).
- * - Header shows Loan Type — Term — Interest Rate.
- * - Buydown controls are Switches; disabled for non-Conventional or when cash-out present (as coded below).
+ * Ultimate Mortgage Calculator — Vercel-safe recode
+ * - Removes all `any` casts
+ * - Ensures no unused variables (uses `pointsTooHigh` in JSX)
+ * - Keeps your existing UI/logic from the latest upload
  */
 
 // Tailwind theme map
@@ -85,8 +79,7 @@ export default function MortgageCalculator_Final_v5() {
   const [interestRate, setInterestRate] = useState<number | "">("");
   const [termYears, setTermYears] = useState<number | "">(30);
 
-  // Fees
-  // NOTE: start blank and never auto-default based on loan type
+  // Fees (start blank; no auto-defaults)
   const [bankFee, setBankFee] = useState<number | "">("");
   const [titleFee, setTitleFee] = useState<number | "">("");
   const [isFundingFeeExempt, setIsFundingFeeExempt] = useState(false);
@@ -96,7 +89,7 @@ export default function MortgageCalculator_Final_v5() {
   const [twoOneBuydown, setTwoOneBuydown] = useState(false);
   const [oneZeroBuydown, setOneZeroBuydown] = useState(false);
 
-  // Borrower View (replaces Hide Compensation). TRUE = hide compensation.
+  // Borrower View (TRUE = hide compensation & base-loan)
   const [borrowerView, setBorrowerView] = useState(false);
 
   // ===== Constants =====
@@ -125,18 +118,16 @@ export default function MortgageCalculator_Final_v5() {
   };
 
   // ===== Effects =====
-  // NOTE: removed the effect that auto-switched Underwriting between $2350 and $1500 for VA IRRRL.
-
+  // Disable buydowns if not Conventional
   useEffect(() => {
-    // Disable buydowns if not Conventional
     if (loanType !== "Conventional") {
       setTwoOneBuydown(false);
       setOneZeroBuydown(false);
     }
   }, [loanType]);
 
+  // No cash-out for IRRRL
   useEffect(() => {
-    // No cash-out for IRRRL
     if (loanType === "VA IRRRL") setCashOut("");
   }, [loanType]);
 
@@ -425,7 +416,6 @@ export default function MortgageCalculator_Final_v5() {
                 <Label className="text-slate-300">Underwriting ($)</Label>
                 <Input className={inputCls} type="number" value={bankFee}
                   onChange={(e) => setBankFee(e.target.value === "" ? "" : Number(e.target.value))} />
-                {/* removed default helper text per request */}
               </div>
 
               <div>
@@ -462,13 +452,12 @@ export default function MortgageCalculator_Final_v5() {
                 <Input className={inputCls} type="number" step="0.01" value={branchGenPointsInput}
                   onChange={(e) => setBranchGenPointsInput(e.target.value === "" ? "" : Number(e.target.value))} />
                 <div className="text-xs text-slate-400 mt-1">BG1: 2.25–3.00 • BG2: 1.50–2.25 • BG3: 0.75–1.50 • BG4: 0.74 and below</div>
-                {/* NEW: subtle yellow warning about using bare-minimum points */}
                 <div className="text-xs text-amber-200 mt-1">
-                  Heads up: using bare-minimum points to hit a BG tier can cause might cause you slip into a lower BG due to costfail
+                  Heads up: using bare-minimum points to hit a BG tier might cause you to slip into a lower BG due to a cost fail.
                 </div>
                 <div className="mt-3 flex justify-end items-center gap-2">
                   <Label htmlFor="toggle-borrower" className="text-xs text-slate-300">Borrower View</Label>
-                  <Switch id="toggle-borrower" checked={borrowerView} onCheckedChange={setBorrowerView} />
+                  <Switch id="toggle-borrower" checked={borrowerView} onCheckedChange={(v) => setBorrowerView(!!v)} />
                 </div>
               </div>
 
@@ -626,7 +615,7 @@ export default function MortgageCalculator_Final_v5() {
               )}
             </CardContent>
 
-            {/* Footer sits after content; no forced card height so no empty column gap. */}
+            {/* Footer */}
             <CardFooter className="mt-6 justify-center py-5">
               <Image
                 src="/Extreme-Loans-Logo-White.webp"
