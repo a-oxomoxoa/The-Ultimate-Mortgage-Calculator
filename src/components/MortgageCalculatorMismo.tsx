@@ -1,60 +1,15 @@
 "use client";
 
-import { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 
-/**
- * Ultimate Mortgage Calculator — Vercel-safe recode
- * -----------------------------------------------
- * • Pure client component, no server-only APIs
- * • No implicit Node APIs — works on Vercel edge or Node runtimes
- * • Strong typing, no `any` casts
- * • No unused vars (keeps pointsTooHigh in JSX)
- * • No default magic numbers for VA IRRRL text/fees
- * • All recent feature requests baked in (Borrower View, term+rate chip, etc.)
- */
+type ArmType = "None" | "3/1" | "5/1";
 
-// Tailwind theme map (no external UI deps required)
-const INDIGO_THEME: Record<string, {
-  sectionTitleText: string;
-  headerWrap: string;
-  accentBoxWrap: string;
-  accentTitleText: string;
-}> = {
-  "300": {
-    sectionTitleText: "text-indigo-300",
-    headerWrap: "border-indigo-300/40 bg-indigo-950/40 text-indigo-100",
-    accentBoxWrap: "bg-indigo-300/10 border-indigo-300/40",
-    accentTitleText: "text-indigo-300",
-  },
-  "400": {
-    sectionTitleText: "text-indigo-400",
-    headerWrap: "border-indigo-400/40 bg-indigo-950/40 text-indigo-100",
-    accentBoxWrap: "bg-indigo-400/10 border-indigo-400/40",
-    accentTitleText: "text-indigo-400",
-  },
-  "500": {
-    sectionTitleText: "text-indigo-500",
-    headerWrap: "border-indigo-500/40 bg-indigo-950/40 text-indigo-100",
-    accentBoxWrap: "bg-indigo-500/10 border-indigo-500/40",
-    accentTitleText: "text-indigo-500",
-  },
-  "600": {
-    sectionTitleText: "text-indigo-600",
-    headerWrap: "border-indigo-600/40 bg-indigo-950/40 text-indigo-100",
-    accentBoxWrap: "bg-indigo-600/10 border-indigo-600/40",
-    accentTitleText: "text-indigo-600",
-  },
-};
-
-// Explicit union type for the theme selector
-export type IndigoShade = "300" | "400" | "500" | "600";
-
-export default function MortgageCalculatorPage() {
+export default function MortgageCalculatorMismo() {
   // ===== Theme =====
-  const [indigoShade, setIndigoShade] = useState<IndigoShade>("500");
-  const t = INDIGO_THEME[indigoShade];
+  const [accentColor, setAccentColor] = useState<string>("#4f46e5");
+  const [lightMode, setLightMode] = useState<boolean>(false);
+  const hiddenColorInput = useRef<HTMLInputElement | null>(null);
 
   // ===== Inputs =====
   const [borrowerName, setBorrowerName] = useState("");
@@ -66,7 +21,7 @@ export default function MortgageCalculatorPage() {
   const [monthlyEscrow, setMonthlyEscrow] = useState<number | "">("");
   const [escrowMonths, setEscrowMonths] = useState<number | "">(2);
 
-  // Debt consolidation (implicit via values)
+  // Debt consolidation
   const [debtPaid, setDebtPaid] = useState<number | "">("");
   const [debtMonthly, setDebtMonthly] = useState<number | "">("");
 
@@ -79,17 +34,20 @@ export default function MortgageCalculatorPage() {
   const [interestRate, setInterestRate] = useState<number | "">("");
   const [termYears, setTermYears] = useState<number | "">(30);
 
-  // Fees (start blank; no auto-defaults)
+  // Fees
   const [bankFee, setBankFee] = useState<number | "">("");
   const [titleFee, setTitleFee] = useState<number | "">("");
   const [isFundingFeeExempt, setIsFundingFeeExempt] = useState(false);
   const [mortgageInsuranceRate, setMortgageInsuranceRate] = useState(0.006);
 
-  // Buydowns (Switches)
+  // Temp buydowns (Conventional only)
   const [twoOneBuydown, setTwoOneBuydown] = useState(false);
   const [oneZeroBuydown, setOneZeroBuydown] = useState(false);
 
-  // Borrower View (TRUE = hide compensation & base-loan & points percent)
+  // ARM (FHA/VA only)
+  const [armType, setArmType] = useState<ArmType>("None");
+
+  // Borrower View (hide compensation/points % box)
   const [borrowerView, setBorrowerView] = useState(false);
 
   // ===== Constants =====
@@ -107,6 +65,13 @@ export default function MortgageCalculatorPage() {
   const fmt = (num: number) => num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const termLabel = `${n(termYears)} year`;
   const rateLabel = interestRate === "" ? "" : ` — ${Number(interestRate).toFixed(3).replace(/0+$/,'').replace(/\.$/,'')}%`;
+  const loanTypeChip = (() => {
+    if ((loanType === "FHA" || loanType === "VA" || loanType === "VA IRRRL") && armType !== "None") {
+      return `${loanType} ${armType} ARM — ${termLabel}${rateLabel}`;
+    }
+    const prefix = loanType === "Conventional" ? "Conventional" : loanType;
+    return `${prefix} Fixed — ${termLabel}${rateLabel}`;
+  })();
 
   const deriveBgTier = (bgPct: number): "BG1" | "BG2" | "BG3" | "BG4" | "—" => {
     if (bgPct >= 2.25 && bgPct <= 3.0) return "BG1";
@@ -117,8 +82,19 @@ export default function MortgageCalculatorPage() {
     return "—";
   };
 
+  const hexToRgba = (hex: string, alpha: number) => {
+    const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    if (!m) return `rgba(79,70,229,${alpha})`;
+    const r = parseInt(m[1], 16);
+    const g = parseInt(m[2], 16);
+    const b = parseInt(m[3], 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
+
+  const accentBg = (alpha = 0.10) => ({ backgroundColor: hexToRgba(accentColor, alpha), borderColor: hexToRgba(accentColor, 0.35) });
+  const accentText = { color: accentColor } as const;
+
   // ===== Effects =====
-  // Disable buydowns if not Conventional
   useEffect(() => {
     if (loanType !== "Conventional") {
       setTwoOneBuydown(false);
@@ -126,12 +102,23 @@ export default function MortgageCalculatorPage() {
     }
   }, [loanType]);
 
-  // No cash-out for IRRRL
   useEffect(() => {
     if (loanType === "VA IRRRL") setCashOut("");
   }, [loanType]);
 
-  // ===== Derived =====
+  useEffect(() => {
+    if (bankFee === "") {
+      setBankFee(loanType === "VA IRRRL" ? 1500 : 2350);
+    }
+  }, [loanType, bankFee]);
+
+  useEffect(() => {
+    if (!(loanType === "FHA" || loanType === "VA" || loanType === "VA IRRRL")) {
+      setArmType("None");
+    }
+  }, [loanType]);
+
+  // ===== Derived numbers =====
   const escrowCost = useMemo(() => n(monthlyEscrow) * n(escrowMonths), [monthlyEscrow, escrowMonths]);
   const effectiveCashOut = loanType === "VA IRRRL" ? 0 : n(cashOut);
   const baseLoanBeforePoints = n(balance) + n(bankFee) + n(titleFee) + escrowCost + effectiveCashOut;
@@ -160,7 +147,16 @@ export default function MortgageCalculatorPage() {
     return (principal * r) / (1 - Math.pow(1 + r, -nper));
   };
 
-  // Pre-subsidy preview for buydown cost
+  const remainingBalance = (principal: number, ratePct: number, totalYears: number, monthsPaid: number) => {
+    const r = Math.max(0, ratePct) / 100 / 12;
+    const N = Math.max(1, totalYears * 12);
+    const pmt = monthlyPI(ratePct, principal, totalYears);
+    const k = Math.min(monthsPaid, N);
+    if (r === 0) return principal - pmt * k;
+    return principal * Math.pow(1 + r, k) - pmt * ((Math.pow(1 + r, k) - 1) / r);
+  };
+
+  // Pre-subsidy preview for Conventional buydown cost
   const PI_pre = monthlyPI(n(interestRate), finalLoanPreBuydown, n(termYears));
   const mipMonthly_pre = loanType === "FHA" ? (finalLoanPreBuydown * FHA_ANNUAL_MIP) / 12 : 0;
   const ltv_pre = n(appraisedValue) > 0 ? (finalLoanPreBuydown / n(appraisedValue)) * 100 : 0;
@@ -178,13 +174,13 @@ export default function MortgageCalculatorPage() {
   const y2PITI_pre = y2PI_pre + n(monthlyEscrow) + mipMonthly_pre + miMonthly_pre;
   const diffY1 = Math.max(0, basePITI_pre - y1PITI_pre);
   const diffY2 = twoOneBuydown ? Math.max(0, basePITI_pre - y2PITI_pre) : 0;
-  const buydownSubsidyCost =
-    loanType === "Conventional" && (twoOneBuydown || oneZeroBuydown)
-      ? diffY1 * 12 + (twoOneBuydown ? diffY2 * 12 : 0)
-      : 0;
+  const buydownSubsidyCost = loanType === "Conventional" && (twoOneBuydown || oneZeroBuydown)
+    ? diffY1 * 12 + (twoOneBuydown ? diffY2 * 12 : 0)
+    : 0;
 
   const finalLoanAmount = finalLoanPreBuydown + buydownSubsidyCost;
 
+  // Monthly after subsidies financed
   const PI = monthlyPI(n(interestRate), finalLoanAmount, n(termYears));
   const mipMonthly = loanType === "FHA" ? (finalLoanAmount * FHA_ANNUAL_MIP) / 12 : 0;
   const ltv = n(appraisedValue) > 0 ? (finalLoanAmount / n(appraisedValue)) * 100 : 0;
@@ -226,22 +222,37 @@ export default function MortgageCalculatorPage() {
   const convCashoutOver80 = loanType === "Conventional" && effectiveCashOut > 0 && ltv > 80;
   const convRateTermOver96 = loanType === "Conventional" && effectiveCashOut === 0 && ltv > 96;
 
+  // ARM adjusted scenario (+1% first adjustment cap)
+  const armYears = armType === "3/1" ? 3 : armType === "5/1" ? 5 : 0;
+  const principalAtAdjust = armYears > 0
+    ? remainingBalance(finalLoanAmount, n(interestRate), n(termYears), armYears * 12)
+    : 0;
+  const adjustedRatePct = armYears > 0 ? n(interestRate) + 1 : 0;
+  const adjustedPI = armYears > 0
+    ? monthlyPI(adjustedRatePct, principalAtAdjust, Math.max(1, n(termYears) - armYears))
+    : 0;
+  const adjustedMip = loanType === "FHA" && armYears > 0 ? (principalAtAdjust * FHA_ANNUAL_MIP) / 12 : 0;
+  const adjustedPITI = armYears > 0 ? adjustedPI + n(monthlyEscrow) + adjustedMip : 0;
+
   // ===== UI helpers =====
+  const textPrimary = lightMode ? "text-slate-900" : "text-slate-100";
+  const textSecondary = lightMode ? "text-slate-600" : "text-slate-300";
+  const panelCls = `rounded-2xl border shadow-xl p-5 ${lightMode ? "bg-white border-slate-200" : "bg-slate-900/60 border-slate-800"}`;
+  const inputCls = `mt-1 border rounded-xl px-3 py-2.5 w-full ${lightMode ? "bg-white border-slate-300 text-slate-900 placeholder-slate-500" : "bg-slate-950 border-slate-700 text-white placeholder-slate-400"}`;
+  const selectCls = inputCls;
+
   const SectionTitle = ({ children }: { children: React.ReactNode }) => (
-    <h3 className={`text-sm font-semibold tracking-wide uppercase ${t.sectionTitleText}`}>{children}</h3>
+    <h3 className={`text-sm font-semibold tracking-wide uppercase`} style={accentText}>{children}</h3>
   );
 
   const StatBox = ({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) => (
-    <div className={`rounded-2xl border p-3 ${accent ? t.accentBoxWrap : "bg-slate-900/40 border-slate-700"}`}>
-      <div className={`text-xs ${accent ? t.accentTitleText : "text-slate-400"}`}>{label}</div>
-      <div className="text-lg font-semibold text-slate-100">{value}</div>
+    <div className={`rounded-2xl border p-3 ${lightMode ? "bg-white" : "bg-slate-900/40"}`} style={accent ? accentBg(0.12) : undefined}>
+      <div className={`text-xs ${textSecondary}`} style={accent ? accentText : undefined}>{label}</div>
+      <div className={`text-lg font-semibold ${textPrimary}`}>{value}</div>
     </div>
   );
 
-  const inputCls = "mt-1 bg-slate-950 border-slate-700 text-white placeholder-slate-400 rounded-xl px-3 py-2.5 w-full";
-  const selectCls = "mt-1 border rounded-xl p-2.5 w-full bg-slate-950 border-slate-700 text-white";
-
-  // ORDERING for cost breakdown (Base Loan only when Borrower View is OFF)
+  // ORDERED cost items
   const loanCostItemsVisible = (() => {
     const items: Array<{ key: string; node: JSX.Element }> = [];
 
@@ -258,12 +269,12 @@ export default function MortgageCalculatorPage() {
       items.push({ key: "lenderCost", node: <StatBox label="Lender Cost" value={`$${fmt(pointsCost)}`} /> });
       items.push({ key: "escrow", node: <StatBox label="Escrow Prepaid" value={`$${fmt(escrowCost)}`} /> });
     } else {
-      // Borrower View: still show Lender Cost + Escrow so totals add up, but omit the points % box
       items.push({ key: "lenderCost_shifted", node: <StatBox label="Lender Cost" value={`$${fmt(pointsCost)}`} /> });
       items.push({ key: "escrow_shifted", node: <StatBox label="Escrow Prepaid" value={`$${fmt(escrowCost)}`} /> });
     }
 
-    items.push({ key: "underwriting", node: <StatBox label="Underwriting" value={`$${fmt(n(bankFee) + n(titleFee))}`} /> });
+    items.push({ key: "bankUnd", node: <StatBox label="Underwriting" value={`$${fmt(n(bankFee))}`} /> });
+    items.push({ key: "titleFee", node: <StatBox label="Title Fee" value={`$${fmt(n(titleFee))}`} /> });
 
     if (showTempBuydown) {
       items.push({ key: "tempBuydown", node: <StatBox label="Temp Buydown Subsidy (financed)" value={`$${fmt(buydownSubsidyCost)}`} /> });
@@ -280,64 +291,76 @@ export default function MortgageCalculatorPage() {
   })();
 
   return (
-    <div className="dark">
-      <div className="min-h-dvh bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100">
-        {/* Top bar */}
-        <div className="mx-auto max-w-7xl px-4 py-4 flex items-center justify-between gap-4">
-          <h1 className="text-xl font-semibold tracking-tight">Ultimate Mortgage Calculator</h1>
+    <div className={lightMode ? "" : "dark"}>
+      <div className={`min-h-dvh ${lightMode ? "bg-white" : "bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950"}`}>
+        {/* Top bar with logo on TOP-LEFT */}
+        <div className="mx-auto max-w-7xl px-4 py-4 flex items-center justify-between gap-4" style={{ color: lightMode ? undefined : "#e5e7eb" }}>
+          <div className="flex items-center gap-3">
+            <Image
+              src="/mortgage-calc-logo.png"
+              alt="Ultimate Mortgage Calculator"
+              width={190}
+              height={54}
+              priority
+              className="select-none"
+            />
+          </div>
 
-          {/* Theme Picker */}
-          <div className="flex items-center gap-2">
-            <label className="text-slate-300">Indigo Shade</label>
-            <select
-              className="ml-2 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100"
-              value={indigoShade}
-              onChange={(e) => setIndigoShade(e.target.value as IndigoShade)}
+          {/* Right-side theme controls */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => hiddenColorInput.current?.click()}
+              className={`rounded-xl border px-3 py-2 text-sm flex items-center gap-2 ${lightMode ? "border-slate-300" : "border-slate-700"}`}
+              title="Pick accent color"
             >
-              <option value="300">300 (lighter)</option>
-              <option value="400">400</option>
-              <option value="500">500 (default)</option>
-              <option value="600">600 (deeper)</option>
-            </select>
+              <span className="inline-block h-4 w-4 rounded" style={{ backgroundColor: accentColor }} />
+              <span className={lightMode ? "text-slate-600" : "text-slate-300"}>Theme Color</span>
+            </button>
+            <input ref={hiddenColorInput} type="color" className="hidden" value={accentColor} onChange={(e) => setAccentColor(e.target.value)} />
+
+            <label className={`flex items-center gap-2 ${lightMode ? "text-slate-600" : "text-slate-300"}`}>
+              <input type="checkbox" checked={lightMode} onChange={(e) => setLightMode(e.target.checked)} />
+              <span>Light Mode</span>
+            </label>
           </div>
         </div>
 
-        {/* Two-column grid where each column controls its own height */}
+        {/* Content grid */}
         <main className="mx-auto max-w-7xl px-4 pb-8 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
           {/* ===== Left: Inputs ===== */}
-          <section className="rounded-2xl border border-slate-800 bg-slate-900/60 shadow-xl p-5 space-y-4">
+          <section className={panelCls}>
             {/* Alerts */}
             <div className="space-y-2">
               {pointsTooHigh && (
-                <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-red-200">
+                <div className={`rounded-xl border p-3 ${lightMode ? "border-red-300 bg-red-50 text-red-700" : "border-red-500/30 bg-red-500/10 text-red-200"}`}>
                   <h4 className="font-semibold">Total points exceed 4.75%</h4>
                   <p className="text-xs mt-1">Reduce Cost From Lender or Branch Gen so combined ≤ 4.75%.</p>
                 </div>
               )}
 
               {loanType === "FHA" && fhaLtvImpossible && (
-                <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-red-200">
+                <div className={`rounded-xl border p-3 ${lightMode ? "border-red-300 bg-red-50 text-red-700" : "border-red-500/30 bg-red-500/10 text-red-200"}`}>
                   <h4 className="font-semibold">FHA LTV exceeds 80%</h4>
                   <p className="text-xs mt-1">This scenario isn’t possible under FHA guidelines.</p>
                 </div>
               )}
 
               {loanType === "Conventional" && convRateTermOver96 && (
-                <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-red-200">
+                <div className={`rounded-xl border p-3 ${lightMode ? "border-red-300 bg-red-50 text-red-700" : "border-red-500/30 bg-red-500/10 text-red-200"}`}>
                   <h4 className="font-semibold">Rate/Term over 96% LTV</h4>
                   <p className="text-xs mt-1">Conventional R/T isn’t allowed above 96% LTV.</p>
                 </div>
               )}
 
               {loanType === "Conventional" && convCashoutOver80 && (
-                <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-red-200">
+                <div className={`rounded-xl border p-3 ${lightMode ? "border-red-300 bg-red-50 text-red-700" : "border-red-500/30 bg-red-500/10 text-red-200"}`}>
                   <h4 className="font-semibold">Cash-Out over 80% LTV</h4>
                   <p className="text-xs mt-1">Conventional cash-out isn’t allowed above 80% LTV.</p>
                 </div>
               )}
 
               {loanType === "Conventional" && convMiWarning && !convCashoutOver80 && (
-                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-amber-100">
+                <div className={`rounded-xl border p-3 ${lightMode ? "border-amber-300 bg-amber-50 text-amber-800" : "border-amber-500/30 bg-amber-500/10 text-amber-100"}`}>
                   <h4 className="font-semibold">Conventional LTV over 80%</h4>
                   <p className="text-xs mt-1">MI will be added. Cash-out not permitted above 80% LTV.</p>
                 </div>
@@ -346,24 +369,24 @@ export default function MortgageCalculatorPage() {
 
             {/* Borrower & loan inputs */}
             <div>
-              <label className="text-slate-300">Borrower Name</label>
+              <label className={textSecondary}>Borrower Name</label>
               <input className={inputCls} type="text" value={borrowerName} onChange={(e) => setBorrowerName(e.target.value)} />
             </div>
 
             <div>
-              <label className="text-slate-300">Borrower Goal</label>
+              <label className={textSecondary}>Borrower Goal</label>
               <input className={inputCls} type="text" value={goal} onChange={(e) => setGoal(e.target.value)} />
             </div>
 
             <div>
-              <label className="text-slate-300">Previous Monthly PITI ($/mo)</label>
+              <label className={textSecondary}>Previous Monthly PITI ($/mo)</label>
               <input className={inputCls} type="number" value={currentPITI}
                 onChange={(e) => setCurrentPITI(e.target.value === "" ? "" : Number(e.target.value))} />
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-end gap-4">
               <div className="flex-1">
-                <label className="text-slate-300">Loan Type</label>
+                <label className={textSecondary}>Loan Type</label>
                 <select className={selectCls} value={loanType} onChange={(e) => setLoanType(e.target.value)}>
                   <option value="Conventional">Conventional</option>
                   <option value="VA">VA</option>
@@ -374,66 +397,67 @@ export default function MortgageCalculatorPage() {
               {(loanType === "VA" || loanType === "VA IRRRL") && (
                 <div className="flex items-center h-10 mt-1">
                   <input id="chk-exempt" type="checkbox" checked={isFundingFeeExempt} onChange={(e) => setIsFundingFeeExempt(e.target.checked)} />
-                  <label htmlFor="chk-exempt" className="ml-2 text-slate-300">Exempt from Funding Fee</label>
+                  <label htmlFor="chk-exempt" className={`ml-2 ${textSecondary}`}>Exempt from Funding Fee</label>
                 </div>
               )}
             </div>
 
             <div>
-              <label className="text-slate-300">Appraised Value ($)</label>
+              <label className={textSecondary}>Appraised Value ($)</label>
               <input className={inputCls} type="number" value={appraisedValue}
                 onChange={(e) => setAppraisedValue(e.target.value === "" ? "" : Number(e.target.value))} />
             </div>
 
             <div>
-              <label className="text-slate-300">Current Loan Balance ($)</label>
+              <label className={textSecondary}>Current Loan Balance ($)</label>
               <input className={inputCls} type="number" value={balance}
                 onChange={(e) => setBalance(e.target.value === "" ? "" : Number(e.target.value))} />
             </div>
 
             {loanType !== "VA IRRRL" && (
               <div>
-                <label className="text-slate-300">Cash Out ($)</label>
+                <label className={textSecondary}>Cash Out ($)</label>
                 <input className={inputCls} type="number" value={cashOut}
                   onChange={(e) => setCashOut(e.target.value === "" ? "" : Number(e.target.value))} />
               </div>
             )}
 
             <div>
-              <label className="text-slate-300">Monthly Escrow ($)</label>
+              <label className={textSecondary}>Monthly Escrow ($)</label>
               <input className={inputCls} type="number" value={monthlyEscrow}
                 onChange={(e) => setMonthlyEscrow(e.target.value === "" ? "" : Number(e.target.value))} />
             </div>
 
             <div>
-              <label className="text-slate-300">Escrow Months</label>
+              <label className={textSecondary}>Escrow Months</label>
               <input className={inputCls} type="number" value={escrowMonths}
                 onChange={(e) => setEscrowMonths(e.target.value === "" ? "" : Number(e.target.value))} />
             </div>
 
             <div>
-              <label className="text-slate-300">Underwriting ($)</label>
+              <label className={textSecondary}>Underwriting (Bank) ($)</label>
               <input className={inputCls} type="number" value={bankFee}
                 onChange={(e) => setBankFee(e.target.value === "" ? "" : Number(e.target.value))} />
+              <p className="text-xs mt-1" style={accentText}>Defaults: $2350 (all) / $1500 (VA IRRRL)</p>
             </div>
 
             <div>
-              <label className="text-slate-300">Title Fee ($)</label>
+              <label className={textSecondary}>Title Fee ($)</label>
               <input className={inputCls} type="number" value={titleFee}
                 onChange={(e) => setTitleFee(e.target.value === "" ? "" : Number(e.target.value))} />
             </div>
 
-            {/* Debt Consolidation (optional fields appear only when cash-out present) */}
+            {/* Debt Consolidation */}
             {effectiveCashOut > 0 && (
-              <div className="rounded-2xl border border-slate-700 p-3 mt-2 space-y-2 bg-slate-900/60">
-                <label className="font-semibold text-slate-200">Debt Consolidation (optional)</label>
+              <div className={`rounded-2xl border p-3 mt-2 space-y-2 ${lightMode ? "bg-white border-slate-200" : "bg-slate-900/60 border-slate-700"}`}>
+                <label className={`font-semibold ${textPrimary}`}>Debt Consolidation (optional)</label>
                 <div>
-                  <label className="text-slate-300">Debt Being Paid Off ($)</label>
+                  <label className={textSecondary}>Debt Being Paid Off ($)</label>
                   <input className={inputCls} type="number" value={debtPaid}
                     onChange={(e) => setDebtPaid(e.target.value === "" ? "" : Number(e.target.value))} />
                 </div>
                 <div>
-                  <label className="text-slate-300">Current Monthly Payments on That Debt ($/mo)</label>
+                  <label className={textSecondary}>Current Monthly Payments on That Debt ($/mo)</label>
                   <input className={inputCls} type="number" value={debtMonthly}
                     onChange={(e) => setDebtMonthly(e.target.value === "" ? "" : Number(e.target.value))} />
                 </div>
@@ -441,52 +465,53 @@ export default function MortgageCalculatorPage() {
             )}
 
             <div>
-              <label className="text-slate-300">Cost From Lender(%)</label>
+              <label className={textSecondary}>Cost From Lender(%)</label>
               <input className={inputCls} type="number" step="0.01" value={uwmPoints}
                 onChange={(e) => setUwmPoints(e.target.value === "" ? "" : Number(e.target.value))} />
             </div>
 
             <div>
-              <label className="text-slate-300">Branch Gen (BG %)</label>
+              <label className={textSecondary}>Branch Gen (BG %)</label>
               <input className={inputCls} type="number" step="0.01" value={branchGenPointsInput}
                 onChange={(e) => setBranchGenPointsInput(e.target.value === "" ? "" : Number(e.target.value))} />
-              <div className="text-xs text-slate-400 mt-1">BG1: 2.25–3.00 • BG2: 1.50–2.25 • BG3: 0.75–1.50 • BG4: 0.74 and below</div>
-              <div className="text-xs text-amber-200 mt-1">
+              <div className={`text-xs mt-1 ${textSecondary}`}>BG1: 2.25–3.00 • BG2: 1.50–2.25 • BG3: 0.75–1.50 • BG4: 0.74 and below</div>
+              <div className="text-xs mt-1" style={{ color: lightMode ? "#b45309" : "#fde68a" }}>
                 Heads up: using bare-minimum points to hit a BG tier might cause you to slip into a lower BG due to a cost fail.
               </div>
               <div className="mt-3 flex justify-end items-center gap-2">
-                <label htmlFor="toggle-borrower" className="text-xs text-slate-300">Borrower View</label>
+                <label htmlFor="toggle-borrower" className={`text-xs ${textSecondary}`}>Borrower View</label>
                 <input id="toggle-borrower" type="checkbox" checked={borrowerView} onChange={(e) => setBorrowerView(e.target.checked)} />
               </div>
             </div>
 
             <div>
-              <label className="text-slate-300">Interest Rate (%)</label>
+              <label className={textSecondary}>Interest Rate (%)</label>
               <input className={inputCls} type="number" step="0.001" value={interestRate}
                 onChange={(e) => setInterestRate(e.target.value === "" ? "" : Number(e.target.value))} />
             </div>
 
             <div>
-              <label className="text-slate-300">Term (Years)</label>
+              <label className={textSecondary}>Term (Years)</label>
               <input className={inputCls} type="number" value={termYears}
                 onChange={(e) => setTermYears(e.target.value === "" ? "" : Number(e.target.value))} />
             </div>
 
             {loanType === "Conventional" && ltv > 80 && (
               <div>
-                <label className="text-slate-300">Mortgage Insurance Rate (Annual %)</label>
+                <label className={textSecondary}>Mortgage Insurance Rate (Annual %)</label>
                 <input className={inputCls} type="number" step="0.001"
                   value={(mortgageInsuranceRate * 100).toFixed(3)}
                   onChange={(e) => setMortgageInsuranceRate(Number(e.target.value) / 100)} />
               </div>
             )}
 
-            {loanType === "Conventional" && (
+            {/* Product Options: Conventional buydowns vs FHA/VA ARMs */}
+            {loanType === "Conventional" ? (
               <div className="mt-2 space-y-2">
-                <label className="font-semibold text-slate-200">Temporary Buydown (Conventional only)</label>
+                <label className={`font-semibold ${textPrimary}`}>Temporary Buydown (Conventional only)</label>
                 <div className="flex items-center gap-8">
                   <div className="flex items-center gap-3">
-                    <label htmlFor="switch-21" className={`text-sm ${twoOneDisabled ? "text-slate-500" : "text-slate-300"}`}>2/1 Buydown</label>
+                    <label htmlFor="switch-21" className={`text-sm ${twoOneDisabled ? "opacity-50" : textSecondary}`}>2/1 Buydown</label>
                     <input
                       id="switch-21"
                       type="checkbox"
@@ -502,7 +527,7 @@ export default function MortgageCalculatorPage() {
                     />
                   </div>
                   <div className="flex items-center gap-3">
-                    <label htmlFor="switch-10" className={`text-sm ${oneZeroDisabled ? "text-slate-500" : "text-slate-300"}`}>1/0 Buydown</label>
+                    <label htmlFor="switch-10" className={`text-sm ${oneZeroDisabled ? "opacity-50" : textSecondary}`}>1/0 Buydown</label>
                     <input
                       id="switch-10"
                       type="checkbox"
@@ -519,21 +544,36 @@ export default function MortgageCalculatorPage() {
                   </div>
                 </div>
               </div>
+            ) : (
+              <div className="mt-2 space-y-2">
+                <label className={`font-semibold ${textPrimary}`}>ARM Options ({loanType})</label>
+                <div className="flex items-center gap-8">
+                  <label className={`flex items-center gap-2 ${textSecondary}`}>
+                    <input type="checkbox" checked={armType === "3/1"} onChange={(e) => setArmType(e.target.checked ? "3/1" : (armType === "3/1" ? "None" : armType))} />
+                    <span>3/1 ARM</span>
+                  </label>
+                  <label className={`flex items-center gap-2 ${textSecondary}`}>
+                    <input type="checkbox" checked={armType === "5/1"} onChange={(e) => setArmType(e.target.checked ? "5/1" : (armType === "5/1" ? "None" : armType))} />
+                    <span>5/1 ARM</span>
+                  </label>
+                </div>
+                <p className={`text-xs ${textSecondary}`}>Selecting an ARM shows an additional breakdown section on the right.</p>
+              </div>
             )}
           </section>
 
-          {/* ===== Right: Results ===== */}
-          <section className="self-start rounded-2xl border border-slate-800 bg-slate-900/60 shadow-xl p-5 space-y-5 flex flex-col">
-            {/* Header chip with loan type, term, and interest rate */}
-            <div className={`rounded-2xl border p-3 ${t.headerWrap}`}>
-              <div className={`text-xs uppercase tracking-wide ${t.accentTitleText}`}>Loan Type</div>
-              <div className="text-lg font-semibold text-indigo-100">{loanType} — {termLabel}{rateLabel}</div>
+          {/* ===== Right: Results (ONE PAGE) ===== */}
+          <section className={`${panelCls} flex flex-col gap-5 relative`}>
+            {/* Loan type chip */}
+            <div className={`rounded-2xl border p-3`} style={{ ...accentBg(0.08) }}>
+              <div className={`text-xs uppercase tracking-wide`} style={accentText}>Loan Type</div>
+              <div className={`text-lg font-semibold ${textPrimary}`}>{loanTypeChip}</div>
             </div>
 
             {(borrowerName || goal) && (
-              <div className="rounded-2xl bg-slate-950 border border-slate-800 p-3">
-                <h3 className="font-semibold text-slate-200">{borrowerName ? `${borrowerName}'s Goal` : "Borrower Goal"}</h3>
-                <p className="text-sm text-slate-300">{goal || "—"}</p>
+              <div className={`rounded-2xl border p-3 ${lightMode ? "bg-white border-slate-200" : "bg-slate-950 border-slate-800"}`}>
+                <h3 className={`font-semibold ${textPrimary}`}>{borrowerName ? `${borrowerName}'s Goal` : "Borrower Goal"}</h3>
+                <p className={`${textSecondary} text-sm`}>{goal || "—"}</p>
               </div>
             )}
 
@@ -545,7 +585,7 @@ export default function MortgageCalculatorPage() {
                 ))}
               </div>
               {showTempBuydown && (
-                <p className="text-xs text-slate-400">Year 1 diff: ${fmt(diffY1)}{twoOneBuydown ? ` • Year 2 diff: $${fmt(diffY2)}` : ""}</p>
+                <p className={`text-xs ${textSecondary}`}>Year 1 diff: ${fmt(diffY1)}{twoOneBuydown ? ` • Year 2 diff: $${fmt(diffY2)}` : ""}</p>
               )}
             </div>
 
@@ -615,16 +655,60 @@ export default function MortgageCalculatorPage() {
               </div>
             )}
 
-            {/* Footer */}
-            <div className="mt-6 flex justify-center py-5">
-              <Image
-                src="/Extreme-Loans-Logo-White.webp"
-                alt="Extreme Loans Logo"
-                width={220}
-                height={80}
-                className="opacity-90"
-                priority
-              />
+            {/* Inline ARM Breakdown */}
+            {armType !== "None" && (
+              <div className="space-y-3">
+                <SectionTitle>ARM Breakdown</SectionTitle>
+                <p className={`text-sm ${textSecondary}`}>
+                  Illustration assumes a max <span style={accentText}>+1.00%</span> first adjustment after {armYears} years.
+                  This is a <strong>2-step plan</strong>: enjoy the lower start rate now, then refinance before the adjustment period in {armYears} years.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <StatBox label="PITI at Start Rate" value={`$${fmt(basePITI)}`} />
+                  <StatBox label={`PITI if +1% at Year ${armYears}`} value={`$${fmt(adjustedPITI)}`} accent />
+                  <StatBox label={`Remaining Principal at Year ${armYears}`} value={`$${fmt(principalAtAdjust)}`} />
+                  <StatBox label="Adjusted Principal & Interest" value={`$${fmt(adjustedPI)}`} />
+                </div>
+                <p className={`text-xs ${textSecondary}`}>Taxes/insurance assumed unchanged.</p>
+              </div>
+            )}
+
+            {/* ===== Right Column Footer (logo locked; © left; NMLS under logo; Prepared right) ===== */}
+            <div className="mt-6 pt-5 border-t border-slate-700/40">
+              {/* Borrower View footer only */}
+              <div className={borrowerView ? "grid grid-cols-3 items-end" : "hidden"}>
+                <div className="text-xs text-slate-300">Extreme Loans © 2025</div>
+                <div className="flex flex-col items-center justify-end">
+                  <div className="h-[46px] w-[130px] flex items-center justify-center">
+                    <Image
+                      src={lightMode ? "/Extreme-Loans-Logo-Color.png" : "/Extreme-Loans-Logo-White.webp"}
+                      alt="Extreme Loans"
+                      width={130}
+                      height={46}
+                      className="opacity-90"
+                      priority
+                    />
+                  </div>
+                  <div className="text-[11px] leading-tight text-slate-300 mt-1">
+                    NMLS: #2025962
+                  </div>
+                </div>
+                <div className="text-xs text-slate-300 text-right">
+                  Prepared September 8, 2025
+                </div>
+              </div>
+
+              {/* Non-borrower footer (center logo only) */}
+              <div className={borrowerView ? "hidden" : "flex justify-center py-5"}>
+                <Image
+                  src={lightMode ? "/Extreme-Loans-Logo-Color.png" : "/Extreme-Loans-Logo-White.webp"}
+                  alt="Extreme Loans Logo"
+                  width={240}
+                  height={86}
+                  className="opacity-90"
+                  priority
+                />
+              </div>
             </div>
           </section>
         </main>
