@@ -677,7 +677,6 @@ export default function MortgageCalculatorMismo() {
             <div className="mt-6 pt-5 border-t border-slate-700/40">
               {/* Borrower View footer only */}
               <div className={borrowerView ? "grid grid-cols-3 items-end" : "hidden"}>
-                <div className="text-xs text-slate-300">Extreme Loans © 2025</div>
                 <div className="flex flex-col items-center justify-end">
                   <div className="h-[46px] w-[130px] flex items-center justify-center">
                     <Image
