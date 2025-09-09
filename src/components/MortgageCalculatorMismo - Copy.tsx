@@ -3,9 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 
+// Fresh recode: Light mode uses a dark gray → black gradient background.
+// Borrower View footer shows the Extreme logo centered with NMLS beneath it and Prepared date below that.
+// Everything else keeps your latest calculator logic & layout patterns.
+
 type ArmType = "None" | "3/1" | "5/1";
 
-export default function MortgageCalculatorMismo_LightGreyPanelsWhite() {
+export default function MortgageCalculatorMismo_LightGradientCenteredFooter() {
   // ===== Theme =====
   const [accentColor, setAccentColor] = useState<string>("#4f46e5");
   const [lightMode, setLightMode] = useState<boolean>(false);
@@ -106,6 +110,7 @@ export default function MortgageCalculatorMismo_LightGreyPanelsWhite() {
     if (loanType === "VA IRRRL") setCashOut("");
   }, [loanType]);
 
+  // Keep your prior defaulting behavior (but made the helper text clearer below)
   useEffect(() => {
     if (bankFee === "") {
       setBankFee(loanType === "VA IRRRL" ? 1500 : 2350);
@@ -235,9 +240,9 @@ export default function MortgageCalculatorMismo_LightGreyPanelsWhite() {
   const adjustedPITI = armYears > 0 ? adjustedPI + n(monthlyEscrow) + adjustedMip : 0;
 
   // ===== UI helpers =====
-  const textPrimary = lightMode ? "text-slate-900" : "text-slate-100";
-  const textSecondary = lightMode ? "text-slate-600" : "text-slate-300";
-  const panelCls = `rounded-2xl border shadow-xl p-5 ${lightMode ? "bg-white border-slate-300" : "bg-slate-900/60 border-slate-800"}`;
+  const textPrimary = lightMode ? "text-slate-100" : "text-slate-100"; // always light text on dark gradient
+  const textSecondary = lightMode ? "text-slate-300" : "text-slate-300";
+  const panelCls = `rounded-2xl border shadow-xl p-5 ${lightMode ? "bg-white/5 border-slate-800" : "bg-slate-900/60 border-slate-800"}`;
   const inputCls = `mt-1 border rounded-xl px-3 py-2.5 w-full ${lightMode ? "bg-white text-slate-900 border-slate-300 placeholder-slate-500" : "bg-slate-950 border-slate-700 text-white placeholder-slate-400"}`;
   const selectCls = inputCls;
 
@@ -246,12 +251,13 @@ export default function MortgageCalculatorMismo_LightGreyPanelsWhite() {
   );
 
   const StatBox = ({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) => (
-    <div className={`rounded-2xl border p-3 ${lightMode ? "bg-white" : "bg-slate-900/40"}`} style={accent ? { ...accentBg(0.12), borderColor: lightMode ? "#cbd5e1" : undefined } : undefined}>
+    <div className={`rounded-2xl border p-3 ${lightMode ? "bg-white/5" : "bg-slate-900/40"}`} style={accent ? accentBg(0.12) : undefined}>
       <div className={`text-xs ${textSecondary}`} style={accent ? accentText : undefined}>{label}</div>
       <div className={`text-lg font-semibold ${textPrimary}`}>{value}</div>
     </div>
   );
 
+  // ORDERED cost items
   const loanCostItemsVisible = (() => {
     const items: Array<{ key: string; node: JSX.Element }> = [];
 
@@ -289,6 +295,7 @@ export default function MortgageCalculatorMismo_LightGreyPanelsWhite() {
     return items;
   })();
 
+  // Prepared date (America/Detroit)
   const preparedLabel = (() => {
     try {
       return new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
@@ -299,10 +306,10 @@ export default function MortgageCalculatorMismo_LightGreyPanelsWhite() {
 
   return (
     <div className={lightMode ? "" : "dark"}>
-      {/* Light mode background is flat grey; dark mode keeps gradient */}
-      <div className={`min-h-dvh ${lightMode ? "bg-neutral-200" : "bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950"}`}>
+      {/* Light mode now uses a DARK gradient as requested */}
+      <div className={`min-h-dvh ${lightMode ? "bg-gradient-to-b from-neutral-800 via-neutral-900 to-black" : "bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950"}`}>
         {/* Top bar with logo on TOP-LEFT */}
-        <div className="mx-auto max-w-7xl px-4 py-4 flex items-center justify-between gap-4" style={{ color: lightMode ? "#0f172a" : "#e5e7eb" }}>
+        <div className="mx-auto max-w-7xl px-4 py-4 flex items-center justify-between gap-4" style={{ color: "#e5e7eb" }}>
           <div className="flex items-center gap-3">
             <Image
               src="/mortgage-calc-logo.png"
@@ -314,18 +321,19 @@ export default function MortgageCalculatorMismo_LightGreyPanelsWhite() {
             />
           </div>
 
+          {/* Right-side theme controls */}
           <div className="flex items-center gap-3">
             <button
               onClick={() => hiddenColorInput.current?.click()}
-              className={`rounded-xl border px-3 py-2 text-sm flex items-center gap-2 ${lightMode ? "border-slate-300 text-slate-700" : "border-slate-700 text-slate-300"}`}
+              className={`rounded-xl border px-3 py-2 text-sm flex items-center gap-2 border-slate-700`}
               title="Pick accent color"
             >
               <span className="inline-block h-4 w-4 rounded" style={{ backgroundColor: accentColor }} />
-              <span>Theme Color</span>
+              <span className="text-slate-300">Theme Color</span>
             </button>
             <input ref={hiddenColorInput} type="color" className="hidden" value={accentColor} onChange={(e) => setAccentColor(e.target.value)} />
 
-            <label className={`flex items-center gap-2 ${lightMode ? "text-slate-700" : "text-slate-300"}`}>
+            <label className={`flex items-center gap-2 text-slate-300`}>
               <input type="checkbox" checked={lightMode} onChange={(e) => setLightMode(e.target.checked)} />
               <span>Light Mode</span>
             </label>
@@ -339,35 +347,35 @@ export default function MortgageCalculatorMismo_LightGreyPanelsWhite() {
             {/* Alerts */}
             <div className="space-y-2">
               {pointsTooHigh && (
-                <div className={`rounded-xl border p-3 border-red-500/30 ${lightMode ? "bg-red-50 text-red-700" : "bg-red-500/10 text-red-200"}`}>
+                <div className={`rounded-xl border p-3 border-red-500/30 bg-red-500/10 text-red-200`}>
                   <h4 className="font-semibold">Total points exceed 4.75%</h4>
                   <p className="text-xs mt-1">Reduce Cost From Lender or Branch Gen so combined ≤ 4.75%.</p>
                 </div>
               )}
 
               {loanType === "FHA" && fhaLtvImpossible && (
-                <div className={`rounded-xl border p-3 border-red-500/30 ${lightMode ? "bg-red-50 text-red-700" : "bg-red-500/10 text-red-200"}`}>
+                <div className={`rounded-xl border p-3 border-red-500/30 bg-red-500/10 text-red-200`}>
                   <h4 className="font-semibold">FHA LTV exceeds 80%</h4>
                   <p className="text-xs mt-1">This scenario isn’t possible under FHA guidelines.</p>
                 </div>
               )}
 
               {loanType === "Conventional" && convRateTermOver96 && (
-                <div className={`rounded-xl border p-3 border-red-500/30 ${lightMode ? "bg-red-50 text-red-700" : "bg-red-500/10 text-red-200"}`}>
+                <div className={`rounded-xl border p-3 border-red-500/30 bg-red-500/10 text-red-200`}>
                   <h4 className="font-semibold">Rate/Term over 96% LTV</h4>
                   <p className="text-xs mt-1">Conventional R/T isn’t allowed above 96% LTV.</p>
                 </div>
               )}
 
               {loanType === "Conventional" && convCashoutOver80 && (
-                <div className={`rounded-xl border p-3 border-red-500/30 ${lightMode ? "bg-red-50 text-red-700" : "bg-red-500/10 text-red-200"}`}>
+                <div className={`rounded-xl border p-3 border-red-500/30 bg-red-500/10 text-red-200`}>
                   <h4 className="font-semibold">Cash-Out over 80% LTV</h4>
                   <p className="text-xs mt-1">Conventional cash-out isn’t allowed above 80% LTV.</p>
                 </div>
               )}
 
               {loanType === "Conventional" && convMiWarning && !convCashoutOver80 && (
-                <div className={`rounded-xl border p-3 ${lightMode ? "bg-amber-50 text-amber-800 border-amber-300" : "border-amber-500/30 bg-amber-500/10 text-amber-100"}`}>
+                <div className={`rounded-xl border p-3 border-amber-500/30 bg-amber-500/10 text-amber-100`}>
                   <h4 className="font-semibold">Conventional LTV over 80%</h4>
                   <p className="text-xs mt-1">MI will be added. Cash-out not permitted above 80% LTV.</p>
                 </div>
@@ -454,8 +462,9 @@ export default function MortgageCalculatorMismo_LightGreyPanelsWhite() {
                 onChange={(e) => setTitleFee(e.target.value === "" ? "" : Number(e.target.value))} />
             </div>
 
+            {/* Debt Consolidation */}
             {effectiveCashOut > 0 && (
-              <div className={`rounded-2xl border p-3 mt-2 space-y-2 ${lightMode ? "bg-white border-slate-300" : "bg-slate-900/60 border-slate-700"}`}>
+              <div className={`rounded-2xl border p-3 mt-2 space-y-2 ${lightMode ? "bg-white/5 border-slate-800" : "bg-slate-900/60 border-slate-700"}`}>
                 <label className={`font-semibold ${textPrimary}`}>Debt Consolidation (optional)</label>
                 <div>
                   <label className={textSecondary}>Debt Being Paid Off ($)</label>
@@ -481,7 +490,7 @@ export default function MortgageCalculatorMismo_LightGreyPanelsWhite() {
               <input className={inputCls} type="number" step="0.01" value={branchGenPointsInput}
                 onChange={(e) => setBranchGenPointsInput(e.target.value === "" ? "" : Number(e.target.value))} />
               <div className={`text-xs mt-1 ${textSecondary}`}>BG1: 2.25–3.00 • BG2: 1.50–2.25 • BG3: 0.75–1.50 • BG4: 0.74 and below</div>
-              <div className="text-xs mt-1" style={{ color: lightMode ? "#92400e" : "#fde68a" }}>
+              <div className="text-xs mt-1" style={{ color: lightMode ? "#fde68a" : "#fde68a" }}>
                 Heads up: using bare-minimum points to hit a BG tier might cause you to slip into a lower BG due to a cost fail.
               </div>
               <div className="mt-3 flex justify-end items-center gap-2">
@@ -511,6 +520,7 @@ export default function MortgageCalculatorMismo_LightGreyPanelsWhite() {
               </div>
             )}
 
+            {/* Product Options: Conventional buydowns vs FHA/VA ARMs */}
             {loanType === "Conventional" ? (
               <div className="mt-2 space-y-2">
                 <label className={`font-semibold ${textPrimary}`}>Temporary Buydown (Conventional only)</label>
@@ -567,23 +577,23 @@ export default function MortgageCalculatorMismo_LightGreyPanelsWhite() {
             )}
           </section>
 
-          {/* ===== Right: Results ===== */}
+          {/* ===== Right: Results (ONE PAGE) ===== */}
           <section className={`${panelCls} flex flex-col gap-5 relative`}>
             {/* Loan type chip */}
-            <div className={`rounded-2xl border p-3 ${lightMode ? "bg-white border-slate-300" : ""}`} style={{ ...accentBg(0.08) }}>
+            <div className={`rounded-2xl border p-3`} style={{ ...accentBg(0.08) }}>
               <div className={`text-xs uppercase tracking-wide`} style={accentText}>Loan Type</div>
               <div className={`text-lg font-semibold ${textPrimary}`}>{loanTypeChip}</div>
             </div>
 
             {(borrowerName || goal) && (
-              <div className={`rounded-2xl border p-3 ${lightMode ? "bg-white border-slate-300" : "bg-slate-950 border-slate-800"}`}>
+              <div className={`rounded-2xl border p-3 bg-slate-950 border-slate-800`}>
                 <h3 className={`font-semibold ${textPrimary}`}>{borrowerName ? `${borrowerName}'s Goal` : "Borrower Goal"}</h3>
                 <p className={`${textSecondary} text-sm`}>{goal || "—"}</p>
               </div>
             )}
 
             <div className="space-y-3">
-              <h3 className={`text-sm font-semibold tracking-wide uppercase`} style={accentText}>Loan & Cost Breakdown</h3>
+              <SectionTitle>Loan & Cost Breakdown</SectionTitle>
               <div className="grid grid-cols-2 gap-3">
                 {loanCostItemsVisible.map((it) => (
                   <div key={it.key}>{it.node}</div>
@@ -595,7 +605,7 @@ export default function MortgageCalculatorMismo_LightGreyPanelsWhite() {
             </div>
 
             <div className="space-y-3">
-              <h3 className={`text-sm font-semibold tracking-wide uppercase`} style={accentText}>Monthly PITI Breakdown</h3>
+              <SectionTitle>Monthly PITI Breakdown</SectionTitle>
               <div className="grid grid-cols-2 gap-3">
                 <StatBox label="Principal & Interest" value={`$${fmt(PI)}`} />
                 <StatBox label="Escrow" value={`$${fmt(n(monthlyEscrow))}`} />
@@ -606,7 +616,7 @@ export default function MortgageCalculatorMismo_LightGreyPanelsWhite() {
             </div>
 
             <div className="space-y-3">
-              <h3 className={`text-sm font-semibold tracking-wide uppercase`} style={accentText}>Savings vs Previous</h3>
+              <SectionTitle>Savings vs Previous</SectionTitle>
               <div className="grid grid-cols-2 gap-3">
                 <StatBox label="Previous PITI" value={`$${fmt(prevPITI)}`} />
                 <StatBox label="Monthly Savings (Base vs Previous)" value={`$${fmt(savingsVsPrev)}`} accent />
@@ -629,7 +639,7 @@ export default function MortgageCalculatorMismo_LightGreyPanelsWhite() {
 
             {isConsolidating && (
               <div className="space-y-3">
-                <h3 className={`text-sm font-semibold tracking-wide uppercase`} style={accentText}>Debt Consolidation Summary</h3>
+                <SectionTitle>Debt Consolidation Summary</SectionTitle>
                 <div className="grid grid-cols-2 gap-3">
                   <StatBox label="They currently pay on their debt" value={`$${fmt(n(debtMonthly))}/mo`} />
                   <StatBox label="Debt Being Paid Off" value={`$${fmt(debtPaidApplied)}`} />
@@ -642,7 +652,7 @@ export default function MortgageCalculatorMismo_LightGreyPanelsWhite() {
 
             {effectiveCashOut > 0 && !isConsolidating && (
               <div className="space-y-3">
-                <h3 className={`text-sm font-semibold tracking-wide uppercase`} style={accentText}>Cash-Out Summary</h3>
+                <SectionTitle>Cash-Out Summary</SectionTitle>
                 <div className="grid grid-cols-2 gap-3">
                   <StatBox label="Cash to Borrower" value={`$${fmt(cashToBorrower)}`} accent />
                 </div>
@@ -651,7 +661,7 @@ export default function MortgageCalculatorMismo_LightGreyPanelsWhite() {
 
             {!borrowerView && (
               <div className="space-y-3">
-                <h3 className={`text-sm font-semibold tracking-wide uppercase`} style={accentText}>Compensation</h3>
+                <SectionTitle>Compensation</SectionTitle>
                 <div className="grid grid-cols-2 gap-3">
                   <StatBox label="Inferred BG Tier" value={`${deriveBgTier(n(branchGenPointsInput))}`} />
                   <StatBox label="Loan Officer" value={`${loCompBps} bps → $${fmt(loCompensation)}`} />
@@ -660,9 +670,10 @@ export default function MortgageCalculatorMismo_LightGreyPanelsWhite() {
               </div>
             )}
 
+            {/* Inline ARM Breakdown */}
             {armType !== "None" && (
               <div className="space-y-3">
-                <h3 className={`text-sm font-semibold tracking-wide uppercase`} style={accentText}>ARM Breakdown</h3>
+                <SectionTitle>ARM Breakdown</SectionTitle>
                 <p className={`text-sm ${textSecondary}`}>
                   Illustration assumes a max <span style={accentText}>+1.00%</span> first adjustment after {armYears} years.
                   This is a <strong>2-step plan</strong>: enjoy the lower start rate now, then refinance before the adjustment period in {armYears} years.
@@ -677,8 +688,8 @@ export default function MortgageCalculatorMismo_LightGreyPanelsWhite() {
               </div>
             )}
 
-            {/* Centered footer in Borrower View */}
-            <div className="mt-6 pt-5 border-t" style={{ borderColor: lightMode ? "#e2e8f0" : "#334155" }}>
+            {/* ===== Right Column Footer (Borrower View): centered logo with NMLS then Prepared date ===== */}
+            <div className="mt-6 pt-5 border-t border-slate-700/40">
               <div className={borrowerView ? "flex flex-col items-center gap-1" : "hidden"}>
                 <Image
                   src={lightMode ? "/Extreme-Loans-Logo-Color.png" : "/Extreme-Loans-Logo-White.webp"}
@@ -688,8 +699,8 @@ export default function MortgageCalculatorMismo_LightGreyPanelsWhite() {
                   className="opacity-90"
                   priority
                 />
-                <div className={`text-[11px] leading-tight ${textSecondary}`}>NMLS: #2025962</div>
-                <div className={`text-[11px] leading-tight ${textSecondary}`}>Prepared {preparedLabel}</div>
+                <div className="text-[11px] leading-tight text-slate-300">NMLS: #2025962</div>
+                <div className="text-[11px] leading-tight text-slate-300">Prepared {preparedLabel}</div>
               </div>
             </div>
           </section>
