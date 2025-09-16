@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 
-// ✅ Component renamed a bit for clarity & to avoid any stale import conflicts on Vercel
-export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths() {
+type ArmType = "None" | "3/1" | "5/1";
+
+export default function MortgageCalculatorMismo_vNext_InterestToggle_ManagerInfo() {
   // ===== Theme =====
   const [accentColor, setAccentColor] = useState<string>("#4f46e5");
   const [lightMode, setLightMode] = useState<boolean>(false);
@@ -26,11 +27,10 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
   const [debtPaid, setDebtPaid] = useState<number | "">("");
   const [debtMonthly, setDebtMonthly] = useState<number | "">("");
 
-  // Previous PITI + previous rate & term-left (now years + months)
+  // Previous PITI + previous rate & term-left
   const [currentPITI, setCurrentPITI] = useState<number | "">("");
   const [prevRate, setPrevRate] = useState<number | "">("");
   const [termLeftYears, setTermLeftYears] = useState<number | "">("");
-  const [termLeftMonths, setTermLeftMonths] = useState<number | "">("");
 
   // Pricing
   const [uwmPoints, setUwmPoints] = useState<number | "">("");
@@ -43,7 +43,8 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
   const [titleFee, setTitleFee] = useState<number | "">("");
   const [isFundingFeeExempt, setIsFundingFeeExempt] = useState(false);
 
-  // MI: keep blank by default
+  // NOTE: Make MI rate input BLANK by default so user can freely input.
+  // Store as ANNUAL PERCENT (e.g., 0.60 for 0.60%).
   const [miAnnualPercent, setMiAnnualPercent] = useState<number | "">("");
 
   // Temp buydowns (Conventional only)
@@ -51,16 +52,16 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
   const [oneZeroBuydown, setOneZeroBuydown] = useState(false);
 
   // ARM (FHA/VA only)
-  type ArmType = "None" | "3/1" | "5/1";
   const [armType, setArmType] = useState<ArmType>("None");
 
   // Borrower View & Interest Savings toggle
-  const [showInterestSavings, setShowInterestSavings] = useState(true);
+  const [showInterestSavings, setShowInterestSavings] = useState(true); // NEW toggle
   const [borrowerView, setBorrowerView] = useState(false);
 
   // ===== Constants =====
   const LO_COMP_BPS: Record<string, number> = { BG1: 100, BG2: 75, BG3: 50, BG4: 25 };
   const LOA_COMP_BPS: Record<string, number> = { BG1: 80, BG2: 60, BG3: 50, BG4: 25 };
+
   const VA_FUNDING_FEE_RATE = 0.033;
   const VA_IRRRL_FEE_RATE = 0.005;
   const FHA_UFMIP_RATE = 0.0175;
@@ -70,6 +71,25 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
   // ===== Utils =====
   const n = (v: number | string | "") => (v === "" || v === undefined || v === null ? 0 : Number(v));
   const fmt = (num: number) => num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const termLabel = `${n(termYears)} year`;
+  const rateLabel = interestRate === "" ? "" : ` — ${Number(interestRate).toFixed(3).replace(/0+$/, '').replace(/\.$/, '')}%`;
+  const loanTypeChip = (() => {
+    if ((loanType === "FHA" || loanType === "VA" || loanType === "VA IRRRL") && armType !== "None") {
+      return `${loanType} ${armType} ARM — ${termLabel}${rateLabel}`;
+    }
+    const prefix = loanType === "Conventional" ? "Conventional" : loanType;
+    return `${prefix} Fixed — ${termLabel}${rateLabel}`;
+  })();
+
+  const deriveBgTier = (bgPct: number): "BG1" | "BG2" | "BG3" | "BG4" | "—" => {
+    if (bgPct >= 2.25 && bgPct <= 3.0) return "BG1";
+    if (bgPct >= 1.5 && bgPct < 2.25) return "BG2";
+    if (bgPct >= 0.75 && bgPct < 1.5) return "BG3";
+    if (bgPct > 0 && bgPct <= 0.74) return "BG4";
+    if (bgPct === 0) return "—";
+    return "—";
+  };
+
   const hexToRgba = (hex: string, alpha: number) => {
     const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     if (!m) return `rgba(79,70,229,${alpha})`;
@@ -78,7 +98,8 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
     const b = parseInt(m[3], 16);
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   };
-  const accentBg = (alpha = 0.1) => ({ backgroundColor: hexToRgba(accentColor, alpha), borderColor: hexToRgba(accentColor, 0.35) });
+
+  const accentBg = (alpha = 0.10) => ({ backgroundColor: hexToRgba(accentColor, alpha), borderColor: hexToRgba(accentColor, 0.35) });
   const accentText = { color: accentColor } as const;
 
   // ===== Effects =====
@@ -198,14 +219,6 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
   const savingsY2VsPrev = Math.max(0, prevPITI - y2PITI);
 
   // Comp calcs
-  const deriveBgTier = (bgPct: number): "BG1" | "BG2" | "BG3" | "BG4" | "—" => {
-    if (bgPct >= 2.25 && bgPct <= 3.0) return "BG1";
-    if (bgPct >= 1.5 && bgPct < 2.25) return "BG2";
-    if (bgPct >= 0.75 && bgPct < 1.5) return "BG3";
-    if (bgPct > 0 && bgPct <= 0.74) return "BG4";
-    if (bgPct === 0) return "—";
-    return "—";
-  };
   const inferredBgTier = deriveBgTier(n(branchGenPointsInput));
   const loCompBps = LO_COMP_BPS[inferredBgTier] ?? 0;
   const loaCompBps = LOA_COMP_BPS[inferredBgTier] ?? 0;
@@ -236,13 +249,12 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
   const currentInterestDue = useMemo(() => {
     const P = n(balance);
     const r = n(prevRate);
-    // NEW: combine years + months for current remaining term
-    const T_years = n(termLeftYears) + n(termLeftMonths) / 12;
-    if (P <= 0 || r <= 0 || T_years <= 0) return 0;
-    const pmt = monthlyPI(r, P, T_years);
-    const totalPaid = pmt * (T_years * 12);
+    const T = n(termLeftYears);
+    if (P <= 0 || r <= 0 || T <= 0) return 0;
+    const pmt = monthlyPI(r, P, T);
+    const totalPaid = pmt * (T * 12);
     return Math.max(0, totalPaid - P);
-  }, [balance, prevRate, termLeftYears, termLeftMonths]);
+  }, [balance, prevRate, termLeftYears]);
 
   const newInterestDue = useMemo(() => {
     const P = finalLoanAmount;
@@ -280,7 +292,7 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
   const loanCostItemsVisible = (() => {
     const items: Array<{ key: string; node: JSX.Element }> = [];
 
-    // Pre-fee amount for FHA/VA/IRRRL in BOTH views — computed differently per view
+    // Show pre-fee amount for FHA/VA/IRRRL in BOTH views — BUT compute differently per view
     if (loanType === "FHA" || loanType === "VA" || loanType === "VA IRRRL") {
       const preFeeLabel = loanType === "FHA" ? "Loan Amount Before UFMIP" : "Loan Amount Before Funding Fee";
       const preFeeValue = borrowerView ? Math.max(0, finalLoanAmount - n(feeAmount)) : Math.max(0, baseLoanWithGovFee - n(feeAmount));
@@ -417,7 +429,7 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
               <input className={inputCls} type="text" value={goal} onChange={(e) => setGoal(e.target.value)} />
             </div>
 
-            {/* Credit Score & Zip Code under Borrower Goal */}
+            {/* NEW: Credit Score & Zip Code under Borrower Goal */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className={textSecondary}>Credit Score</label>
@@ -435,29 +447,19 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
                 onChange={(e) => setCurrentPITI(e.target.value === "" ? "" : Number(e.target.value))} />
             </div>
 
-            {/* previous rate + term-left (YEARS + MONTHS), shown only when Interest Savings is toggled ON */}
-            {showInterestSavings && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="sm:col-span-1">
-                  <label className={textSecondary}>Previous Interest Rate (%)</label>
-                  <input className={inputCls} type="number" step="0.001" value={prevRate}
-                    onChange={(e) => setPrevRate(e.target.value === "" ? "" : Number(e.target.value))} />
-                </div>
-                <div>
-                  <label className={textSecondary}>Current Loan Term Left (Years)</label>
-                  <input className={inputCls} type="number" min={0} step={1} value={termLeftYears}
-                    onChange={(e) => setTermLeftYears(e.target.value === "" ? "" : Math.max(0, Number(e.target.value)))} />
-                </div>
-                <div>
-                  <label className={textSecondary}>Current Loan Term Left (Months)</label>
-                  <input className={inputCls} type="number" min={0} max={11} step={1} value={termLeftMonths}
-                    onChange={(e) => {
-                      const v = e.target.value === "" ? "" : Math.max(0, Math.min(11, Number(e.target.value)));
-                      setTermLeftMonths(v as number | "");
-                    }} />
-                </div>
+            {/* previous rate + term-left, right below Current PITI */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className={textSecondary}>Previous Interest Rate (%)</label>
+                <input className={inputCls} type="number" step="0.001" value={prevRate}
+                  onChange={(e) => setPrevRate(e.target.value === "" ? "" : Number(e.target.value))} />
               </div>
-            )}
+              <div>
+                <label className={textSecondary}>Term Left on Current Mortgage (years)</label>
+                <input className={inputCls} type="number" step="1" value={termLeftYears}
+                  onChange={(e) => setTermLeftYears(e.target.value === "" ? "" : Number(e.target.value))} />
+              </div>
+            </div>
 
             <div className="flex flex-col sm:flex-row sm:items-end gap-4">
               <div className="flex-1">
@@ -553,7 +555,7 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
                 Heads up: using bare-minimum points to hit a BG tier might cause you to slip into a lower BG due to a cost fail.
               </div>
               <div className="mt-3 flex justify-end items-center gap-4">
-                {/* Interest Savings toggle (to the LEFT of Borrower View) */}
+                {/* NEW: Interest Savings toggle to the LEFT of Borrower View */}
                 <label htmlFor="toggle-interest" className={`text-xs ${textSecondary} flex items-center gap-2`}>
                   <input id="toggle-interest" type="checkbox" checked={showInterestSavings} onChange={(e) => setShowInterestSavings(e.target.checked)} />
                   <span>Interest Savings</span>
@@ -647,15 +649,7 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
             {/* Loan type chip */}
             <div className={`rounded-2xl border p-3 ${lightMode ? "bg-white border-slate-300" : ""}`} style={{ ...accentBg(0.08) }}>
               <div className={`text-xs uppercase tracking-wide`} style={accentText}>Loan Type</div>
-              <div className={`text-lg font-semibold ${textPrimary}`}>
-                {(() => {
-                  const rateLabel = interestRate === "" ? "" : ` — ${Number(interestRate).toFixed(3).replace(/0+$/, '').replace(/\.$/, '')}%`;
-                  const termLabel = `${n(termYears)} year`;
-                  if ((loanType === "FHA" || loanType === "VA" || loanType === "VA IRRRL") && armType !== "None") return `${loanType} ${armType} ARM — ${termLabel}${rateLabel}`;
-                  const prefix = loanType === "Conventional" ? "Conventional" : loanType;
-                  return `${prefix} Fixed — ${termLabel}${rateLabel}`;
-                })()}
-              </div>
+              <div className={`text-lg font-semibold ${textPrimary}`}>{loanTypeChip}</div>
             </div>
 
             {(borrowerName || goal) && (
@@ -665,7 +659,7 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
               </div>
             )}
 
-            {/* Manager Information (only in NORMAL view) */}
+            {/* NEW: Manager Information (only in NORMAL view) */}
             {!borrowerView && (
               <div className={`rounded-2xl border p-3 ${lightMode ? "bg-white border-slate-300" : "bg-slate-950 border-slate-800"}`}>
                 <h3 className={`font-semibold ${textPrimary}`}>Manager Information</h3>
