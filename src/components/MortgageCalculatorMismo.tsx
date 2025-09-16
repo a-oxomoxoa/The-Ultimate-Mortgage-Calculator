@@ -271,7 +271,10 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
   );
 
   const StatBox = ({ label, value, accent = false, valueClassName = "" }: { label: string; value: string; accent?: boolean; valueClassName?: string }) => (
-    <div className={`rounded-2xl border p-3 ${lightMode ? "bg-white" : "bg-slate-900/40"}`} style={accent ? { ...accentBg(0.12), borderColor: lightMode ? "#cbd5e1" : undefined } : undefined}>
+    <div
+      className={`rounded-2xl border p-3 ${lightMode ? "bg-white" : "bg-slate-900/40"}`}
+      style={accent ? { ...accentBg(0.12), borderColor: lightMode ? "#cbd5e1" : undefined } : undefined}
+    >
       <div className={`text-xs ${textSecondary}`} style={accent ? accentText : undefined}>{label}</div>
       <div className={`text-lg font-semibold ${textPrimary} ${valueClassName}`}>{value}</div>
     </div>
@@ -694,8 +697,8 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
                 <StatBox label="Escrow" value={`$${fmt(n(monthlyEscrow))}`} />
                 {loanType === "FHA" && <StatBox label="MIP" value={`$${fmt(mipMonthly)}`} />}
                 {loanType === "Conventional" && ltv > 80 && <StatBox label="Mortgage Insurance" value={`$${fmt(miMonthly)}`} />}
-                {/* GREEN TEXT for Total Monthly Payment */}
-                <StatBox label="Total Monthly Payment (New PITI)" value={`$${fmt(basePITI)}`} valueClassName="text-emerald-500" />
+                {/* ACCENT bubble for Total Monthly Payment */}
+                <StatBox label="Total Monthly Payment (New PITI)" value={`$${fmt(basePITI)}`} accent />
               </div>
             </div>
 
@@ -703,20 +706,21 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
               <SectionTitle>Savings vs Previous</SectionTitle>
               <div className="grid grid-cols-2 gap-3">
                 <StatBox label="Previous PITI" value={`$${fmt(prevPITI)}`} />
-                {/* GREEN TEXT for Monthly Savings */}
-                <StatBox label="Monthly Savings (Base vs Previous)" value={`$${fmt(savingsVsPrev)}`} valueClassName="text-emerald-500" />
+                {/* ACCENT bubble for Monthly Savings */}
+                <StatBox label="Monthly Savings (Base vs Previous)" value={`$${fmt(savingsVsPrev)}`} accent />
               </div>
 
               {showTempBuydown && (
                 <div className="grid grid-cols-2 gap-3">
                   {twoOneBuydown && (
                     <>
-                      <StatBox label="Year 1 PITI (vs Prev)" value={`$${fmt(y1PITI)} · saves $${fmt(savingsY1VsPrev)}`} />
-                      <StatBox label="Year 2 PITI (vs Prev)" value={`$${fmt(y2PITI)} · saves $${fmt(savingsY2VsPrev)}`} />
+                      {/* ACCENT bubbles for Year 1 & Year 2 PITI */}
+                      <StatBox label="Year 1 PITI (vs Prev)" value={`$${fmt(y1PITI)} · saves $${fmt(savingsY1VsPrev)}`} accent />
+                      <StatBox label="Year 2 PITI (vs Prev)" value={`$${fmt(y2PITI)} · saves $${fmt(savingsY2VsPrev)}`} accent />
                     </>
                   )}
                   {oneZeroBuydown && (
-                    <StatBox label="Year 1 PITI (vs Prev)" value={`$${fmt(y1PITI)} · saves $${fmt(savingsY1VsPrev)}`} />
+                    <StatBox label="Year 1 PITI (vs Prev)" value={`$${fmt(y1PITI)} · saves $${fmt(savingsY1VsPrev)}`} accent />
                   )}
                 </div>
               )}
@@ -730,9 +734,9 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
                 <div className="grid grid-cols-2 gap-3">
                   <StatBox label="Current Interest Due" value={`$${fmt(currentInterestDue)}`} />
                   <StatBox label="New Interest Due" value={`$${fmt(newInterestDue)}`} />
-                  <StatBox label="Interest Savings" value={`$${fmt(interestSavings)}`} valueClassName="text-emerald-500" />
-                  {/* GREEN TEXT for True Interest Savings */}
-                  <StatBox label="True Interest Savings after Cost" value={`$${fmt(trueSavingsAfterCost)}`} valueClassName="text-emerald-500" />
+                  <StatBox label="Interest Savings" value={`$${fmt(interestSavings)}`} />
+                  {/* ACCENT bubble for True Interest Savings */}
+                  <StatBox label="True Interest Savings after Cost" value={`$${fmt(trueSavingsAfterCost)}`} accent />
                 </div>
               </div>
             )}
@@ -763,9 +767,9 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
               <div className="space-y-3">
                 <SectionTitle>Compensation</SectionTitle>
                 <div className="grid grid-cols-2 gap-3">
-                  <StatBox label="Inferred BG Tier" value={`${deriveBgTier(n(branchGenPointsInput))}`} />
-                  <StatBox label="Loan Officer" value={`${loCompBps} bps → $${fmt(loCompensation)}`} />
-                  <StatBox label="Associate" value={`${loaCompBps} bps → $${fmt(loaCompensation)}`} />
+                    <StatBox label="Inferred BG Tier" value={`${deriveBgTier(n(branchGenPointsInput))}`} />
+                    <StatBox label="Loan Officer" value={`${loCompBps} bps → $${fmt(loCompensation)}`} />
+                    <StatBox label="Associate" value={`${loaCompBps} bps → $${fmt(loaCompensation)}`} />
                 </div>
               </div>
             )}
@@ -781,7 +785,8 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
                   <StatBox label="PITI at Start Rate" value={`$${fmt(basePITI)}`} />
                   <StatBox label={`PITI if +1% at Year ${armYears}`} value={`$${fmt(adjustedPITI)}`} />
                   <StatBox label={`Remaining Principal at Year ${armYears}`} value={`$${fmt(principalAtAdjust)}`} />
-                  <StatBox label="Adjusted Principal & Interest" value={`$${fmt(adjustedPI)}`} />
+                  {/* ACCENT bubble for Adjusted Principal & Interest */}
+                  <StatBox label="Adjusted Principal & Interest" value={`$${fmt(adjustedPI)}`} accent />
                 </div>
                 <p className={`text-xs ${textSecondary}`}>Taxes/insurance assumed unchanged.</p>
               </div>
