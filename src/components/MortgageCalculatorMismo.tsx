@@ -284,10 +284,10 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
   const loanCostItemsVisible = (() => {
     const items: Array<{ key: string; node: JSX.Element }> = [];
 
-    // Pre-fee amount for FHA/VA/IRRRL in BOTH views — computed differently per view
+    // Pre-fee amount for FHA/VA/IRRRL in BOTH views — now always Final Loan Amount - fee
     if (loanType === "FHA" || loanType === "VA" || loanType === "VA IRRRL") {
       const preFeeLabel = loanType === "FHA" ? "Loan Amount Before UFMIP" : "Loan Amount Before Funding Fee";
-      const preFeeValue = borrowerView ? Math.max(0, finalLoanAmount - n(feeAmount)) : Math.max(0, baseLoanWithGovFee - n(feeAmount));
+      const preFeeValue = Math.max(0, finalLoanAmount - n(feeAmount));
       items.push({ key: "beforeGov", node: <StatBox label={preFeeLabel} value={`$${fmt(preFeeValue)}`} accent /> });
     }
 
