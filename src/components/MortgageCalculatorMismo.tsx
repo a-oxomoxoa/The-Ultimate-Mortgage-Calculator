@@ -4,8 +4,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 
-// ✅ Component renamed a bit for clarity & to avoid any stale import conflicts on Vercel
-export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths() {
+// Single-file, Vercel-compatible React component
+export default function MortgageCalculatorMismo_vNext() {
   // ===== Theme =====
   const [accentColor, setAccentColor] = useState<string>("#4f46e5");
   const [lightMode, setLightMode] = useState<boolean>(false);
@@ -20,18 +20,32 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
   const [appraisedValue, setAppraisedValue] = useState<number | "">("");
   const [balance, setBalance] = useState<number | "">("");
   const [cashOut, setCashOut] = useState<number | "">("");
+
+  // Escrow inputs
   const [monthlyEscrow, setMonthlyEscrow] = useState<number | "">("");
   const [escrowMonths, setEscrowMonths] = useState<number | "">(2);
+
+  // FHA-specific: current monthly MIP to subtract from escrow input
+  const [currentFhaMIPMonthly, setCurrentFhaMIPMonthly] = useState<number | "">("");
+
+  // MI/MIP monthly dollars for the NEW loan (no % calc anymore)
+  const [convMiMonthlyDollar, setConvMiMonthlyDollar] = useState<number | "">(""); // Conventional & LTV>80
+  const [fhaMipMonthlyDollar, setFhaMipMonthlyDollar] = useState<number | "">(""); // FHA
 
   // Debt consolidation
   const [debtPaid, setDebtPaid] = useState<number | "">("");
   const [debtMonthly, setDebtMonthly] = useState<number | "">("");
 
-  // Previous PITI + previous rate & term-left (now years + months)
+  // Previous PITI + previous rate & term-left
   const [currentPITI, setCurrentPITI] = useState<number | "">("");
   const [prevRate, setPrevRate] = useState<number | "">("");
+
+  // Term-left inputs
   const [termLeftYears, setTermLeftYears] = useState<number | "">("");
   const [termLeftMonths, setTermLeftMonths] = useState<number | "">("");
+
+  // Planned horizon input (always visible when Interest Savings is ON)
+  const [plannedYearsInHome, setPlannedYearsInHome] = useState<number | "">("");
 
   // Pricing
   const [uwmPoints, setUwmPoints] = useState<number | "">("");
@@ -43,9 +57,6 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
   const [bankFee, setBankFee] = useState<number | "">("");
   const [titleFee, setTitleFee] = useState<number | "">("");
   const [isFundingFeeExempt, setIsFundingFeeExempt] = useState(false);
-
-  // MI: keep blank by default
-  const [miAnnualPercent, setMiAnnualPercent] = useState<number | "">("");
 
   // Temp buydowns (Conventional only)
   const [twoOneBuydown, setTwoOneBuydown] = useState(false);
@@ -65,7 +76,6 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
   const VA_FUNDING_FEE_RATE = 0.033;
   const VA_IRRRL_FEE_RATE = 0.005;
   const FHA_UFMIP_RATE = 0.0175;
-  const FHA_ANNUAL_MIP = 0.0055;
   const TOTAL_POINTS_ALERT = 4.75;
 
   // ===== Utils =====
@@ -123,9 +133,24 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
     return principal * Math.pow(1 + r, k) - pmt * ((Math.pow(1 + r, k) - 1) / r);
   };
 
+  const interestOverMonths = (principal: number, ratePct: number, totalYears: number, months: number) => {
+    if (principal <= 0 || ratePct <= 0 || totalYears <= 0 || months <= 0) return 0;
+    const pmt = monthlyPI(ratePct, principal, totalYears);
+    const balAfter = remainingBalance(principal, ratePct, totalYears, months);
+    const principalRepaid = Math.max(0, principal - balAfter);
+    const totalPaid = pmt * months;
+    return Math.max(0, totalPaid - principalRepaid);
+  };
+
   // ===== Derived numbers =====
-  const escrowCost = useMemo(() => n(monthlyEscrow) * n(escrowMonths), [monthlyEscrow, escrowMonths]);
   const effectiveCashOut = loanType === "VA IRRRL" ? 0 : n(cashOut);
+
+  // Escrow handling: FHA subtract current MIP from the escrow input
+  const effectiveMonthlyEscrow = loanType === "FHA"
+    ? Math.max(0, n(monthlyEscrow) - n(currentFhaMIPMonthly))
+    : n(monthlyEscrow);
+
+  const escrowCost = useMemo(() => effectiveMonthlyEscrow * n(escrowMonths), [effectiveMonthlyEscrow, escrowMonths]);
 
   // Core build (before & after gov fees)
   const baseLoanBeforePoints = n(balance) + n(bankFee) + n(titleFee) + escrowCost + effectiveCashOut;
@@ -147,12 +172,14 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
   const baseTotalCostsNoBuydown = n(bankFee) + n(titleFee) + escrowCost + pointsCost + fundingFee + ufmip;
   const finalLoanPreBuydown = n(balance) + effectiveCashOut + baseTotalCostsNoBuydown;
 
-  // Pre-subsidy preview for Conventional buydown cost
+  // LTV & buydown preview
   const ltv_pre = n(appraisedValue) > 0 ? (finalLoanPreBuydown / n(appraisedValue)) * 100 : 0;
   const PI_pre = monthlyPI(n(interestRate), finalLoanPreBuydown, n(termYears));
-  const mipMonthly_pre = loanType === "FHA" ? (finalLoanPreBuydown * FHA_ANNUAL_MIP) / 12 : 0;
-  const miMonthly_pre = loanType === "Conventional" && ltv_pre > 80 && n(miAnnualPercent) > 0 ? (finalLoanPreBuydown * (n(miAnnualPercent) / 100)) / 12 : 0;
-  const basePITI_pre = PI_pre + n(monthlyEscrow) + mipMonthly_pre + miMonthly_pre;
+
+  // Monthly MI/MIP dollars for preview (based on new inputs)
+  const mipMonthly_pre = loanType === "FHA" ? n(fhaMipMonthlyDollar) : 0;
+  const miMonthly_pre = loanType === "Conventional" && ltv_pre > 80 ? n(convMiMonthlyDollar) : 0;
+  const basePITI_pre = PI_pre + effectiveMonthlyEscrow + mipMonthly_pre + miMonthly_pre;
 
   const twoOneDisabled = loanType === "Conventional" && effectiveCashOut > 0;
   const oneZeroDisabled = loanType === "Conventional" && effectiveCashOut > 0;
@@ -161,8 +188,8 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
   const y2RatePct_pre = (loanType === "Conventional" && twoOneBuydown) ? n(interestRate) - 1 : n(interestRate);
   const y1PI_pre = monthlyPI(y1RatePct_pre, finalLoanPreBuydown, n(termYears));
   const y2PI_pre = monthlyPI(y2RatePct_pre, finalLoanPreBuydown, n(termYears));
-  const y1PITI_pre = y1PI_pre + n(monthlyEscrow) + mipMonthly_pre + miMonthly_pre;
-  const y2PITI_pre = y2PI_pre + n(monthlyEscrow) + mipMonthly_pre + miMonthly_pre;
+  const y1PITI_pre = y1PI_pre + effectiveMonthlyEscrow + mipMonthly_pre + miMonthly_pre;
+  const y2PITI_pre = y2PI_pre + effectiveMonthlyEscrow + mipMonthly_pre + miMonthly_pre;
   const diffY1 = Math.max(0, basePITI_pre - y1PITI_pre);
   const diffY2 = twoOneBuydown ? Math.max(0, basePITI_pre - y2PITI_pre) : 0;
   const buydownSubsidyCost = loanType === "Conventional" && (twoOneBuydown || oneZeroBuydown)
@@ -173,10 +200,10 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
 
   // Monthly after subsidies financed
   const PI = monthlyPI(n(interestRate), finalLoanAmount, n(termYears));
-  const mipMonthly = loanType === "FHA" ? (finalLoanAmount * FHA_ANNUAL_MIP) / 12 : 0;
+  const mipMonthly = loanType === "FHA" ? n(fhaMipMonthlyDollar) : 0;
   const ltv = n(appraisedValue) > 0 ? (finalLoanAmount / n(appraisedValue)) * 100 : 0;
-  const miMonthly = loanType === "Conventional" && ltv > 80 && n(miAnnualPercent) > 0 ? (finalLoanAmount * (n(miAnnualPercent) / 100)) / 12 : 0;
-  const basePITI = PI + n(monthlyEscrow) + mipMonthly + miMonthly;
+  const miMonthly = loanType === "Conventional" && ltv > 80 ? n(convMiMonthlyDollar) : 0;
+  const basePITI = PI + effectiveMonthlyEscrow + mipMonthly + miMonthly;
 
   // Debt consolidation
   const isConsolidating = effectiveCashOut > 0 && (n(debtPaid) > 0 || n(debtMonthly) > 0);
@@ -193,8 +220,8 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
   const y2RatePct = twoOneBuydown ? n(interestRate) - 1 : n(interestRate);
   const y1PI = monthlyPI(y1RatePct, finalLoanAmount, n(termYears));
   const y2PI = monthlyPI(y2RatePct, finalLoanAmount, n(termYears));
-  const y1PITI = y1PI + n(monthlyEscrow) + mipMonthly + miMonthly;
-  const y2PITI = y2PI + n(monthlyEscrow) + mipMonthly + miMonthly;
+  const y1PITI = y1PI + effectiveMonthlyEscrow + mipMonthly + miMonthly;
+  const y2PITI = y2PI + effectiveMonthlyEscrow + mipMonthly + miMonthly;
   const savingsY1VsPrev = Math.max(0, prevPITI - y1PITI);
   const savingsY2VsPrev = Math.max(0, prevPITI - y2PITI);
 
@@ -208,15 +235,20 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
     return "—";
   };
   const inferredBgTier = deriveBgTier(n(branchGenPointsInput));
-  const loCompBps = LO_COMP_BPS[inferredBgTier] ?? 0;
-  const loaCompBps = LOA_COMP_BPS[inferredBgTier] ?? 0;
+  const LO_COMP_BPS_MAP: Record<string, number> = { BG1: 100, BG2: 75, BG3: 50, BG4: 25, "—": 0 };
+  const LOA_COMP_BPS_MAP: Record<string, number> = { BG1: 80, BG2: 60, BG3: 50, BG4: 25, "—": 0 };
+  const loCompBps = LO_COMP_BPS_MAP[inferredBgTier] ?? 0;
+  const loaCompBps = LOA_COMP_BPS_MAP[inferredBgTier] ?? 0;
   const loCompensation = finalLoanAmount * (loCompBps / 10000);
   const loaCompensation = finalLoanAmount * (loaCompBps / 10000);
 
   const feeLabel = loanType === "FHA" ? "UFMIP" : "Funding Fee";
   const feeAmount = loanType === "FHA" ? ufmip : fundingFee;
 
-  const fhaLtvImpossible = loanType === "FHA" && ltv > 80;
+  // ===== UPDATED FHA LTV logic & warnings =====
+  const fhaCashoutOver80 = loanType === "FHA" && effectiveCashOut > 0 && ltv > 80; // Cash-out cap 80%
+  const fhaRateTermOver9775 = loanType === "FHA" && effectiveCashOut === 0 && ltv > 97.75; // R/T cap 97.75%
+
   const convMiWarning = loanType === "Conventional" && ltv > 80;
   const convCashoutOver80 = loanType === "Conventional" && effectiveCashOut > 0 && ltv > 80;
   const convRateTermOver96 = loanType === "Conventional" && effectiveCashOut === 0 && ltv > 96;
@@ -230,14 +262,15 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
   const adjustedPI = armYears > 0
     ? monthlyPI(adjustedRatePct, principalAtAdjust, Math.max(1, n(termYears) - armYears))
     : 0;
-  const adjustedMip = loanType === "FHA" && armYears > 0 ? (principalAtAdjust * FHA_ANNUAL_MIP) / 12 : 0;
-  const adjustedPITI = armYears > 0 ? adjustedPI + n(monthlyEscrow) + adjustedMip : 0;
+  const adjustedMip = loanType === "FHA" && armYears > 0 ? n(fhaMipMonthlyDollar) : 0; // Use input MIP dollars
+  const adjustedPITI = armYears > 0 ? adjustedPI + effectiveMonthlyEscrow + adjustedMip : 0;
 
-  // ===== Interest Savings (lifetime) =====
-  const currentInterestDue = useMemo(() => {
+  // ===== Interest Savings (full term vs planned horizon) =====
+  const plannedMonths = showInterestSavings ? Math.max(0, Math.round(n(plannedYearsInHome) * 12)) : 0;
+
+  const currentInterestDue_total = useMemo(() => {
     const P = n(balance);
     const r = n(prevRate);
-    // NEW: combine years + months for current remaining term
     const T_years = n(termLeftYears) + n(termLeftMonths) / 12;
     if (P <= 0 || r <= 0 || T_years <= 0) return 0;
     const pmt = monthlyPI(r, P, T_years);
@@ -245,7 +278,7 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
     return Math.max(0, totalPaid - P);
   }, [balance, prevRate, termLeftYears, termLeftMonths]);
 
-  const newInterestDue = useMemo(() => {
+  const newInterestDue_total = useMemo(() => {
     const P = finalLoanAmount;
     const r = n(interestRate);
     const T = n(termYears);
@@ -254,6 +287,28 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
     const totalPaid = pmt * (T * 12);
     return Math.max(0, totalPaid - P);
   }, [finalLoanAmount, interestRate, termYears]);
+
+  const currentInterestDue_horizon = useMemo(() => {
+    if (plannedMonths <= 0) return currentInterestDue_total;
+    const P = n(balance);
+    const r = n(prevRate);
+    const T_years = n(termLeftYears) + n(termLeftMonths) / 12;
+    const maxMonths = Math.max(1, Math.min(plannedMonths, Math.round(T_years * 12)));
+    return interestOverMonths(P, r, T_years, maxMonths);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plannedMonths, balance, prevRate, termLeftYears, termLeftMonths]);
+
+  const newInterestDue_horizon = useMemo(() => {
+    if (plannedMonths <= 0) return newInterestDue_total;
+    const P = finalLoanAmount;
+    const r = n(interestRate);
+    const T = n(termYears);
+    const maxMonths = Math.max(1, Math.min(plannedMonths, Math.round(T * 12)));
+    return interestOverMonths(P, r, T, maxMonths);
+  }, [plannedMonths, finalLoanAmount, interestRate, termYears]);
+
+  const currentInterestDue = plannedMonths > 0 ? currentInterestDue_horizon : currentInterestDue_total;
+  const newInterestDue = plannedMonths > 0 ? newInterestDue_horizon : newInterestDue_total;
 
   const interestSavings = Math.max(0, currentInterestDue - newInterestDue);
   const totalCostsAll = baseTotalCostsNoBuydown + buydownSubsidyCost;
@@ -284,13 +339,6 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
   const loanCostItemsVisible = (() => {
     const items: Array<{ key: string; node: JSX.Element }> = [];
 
-    // Pre-fee amount for FHA/VA/IRRRL in BOTH views — now always Final Loan Amount - fee
-    if (loanType === "FHA" || loanType === "VA" || loanType === "VA IRRRL") {
-      const preFeeLabel = loanType === "FHA" ? "Loan Amount Before UFMIP" : "Loan Amount Before Funding Fee";
-      const preFeeValue = Math.max(0, finalLoanAmount - n(feeAmount));
-      items.push({ key: "beforeGov", node: <StatBox label={preFeeLabel} value={`$${fmt(preFeeValue)}`} accent /> });
-    }
-
     if (!borrowerView) {
       items.push({ key: "baseLoan", node: <StatBox label="Base Loan (Before Points)" value={`$${fmt(baseLoanWithGovFee)}`} /> });
     }
@@ -302,10 +350,10 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
     if (!borrowerView) {
       items.push({ key: "totalPoints", node: <StatBox label="Total Points Entered" value={`${(uwmPts + bgPts).toFixed(2)}%`} /> });
       items.push({ key: "lenderCost", node: <StatBox label="Lender Cost" value={`$${fmt(pointsCost)}`} /> });
-      items.push({ key: "escrow", node: <StatBox label="Escrow Prepaid" value={`$${fmt(escrowCost)}`} /> });
+      items.push({ key: "escrow", node: <StatBox label="Escrow" value={`$${fmt(escrowCost)}`} /> });
     } else {
       items.push({ key: "lenderCost_shifted", node: <StatBox label="Lender Cost" value={`$${fmt(pointsCost)}`} /> });
-      items.push({ key: "escrow_shifted", node: <StatBox label="Escrow Prepaid" value={`$${fmt(escrowCost)}`} /> });
+      items.push({ key: "escrow_shifted", node: <StatBox label="Escrow" value={`$${fmt(escrowCost)}`} /> });
     }
 
     items.push({ key: "bankUnd", node: <StatBox label="Underwriting" value={`$${fmt(n(bankFee))}`} /> });
@@ -318,7 +366,8 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
     items.push({ key: "totalCosts", node: <StatBox label="Total Costs" value={`$${fmt(baseTotalCostsNoBuydown + buydownSubsidyCost)}`} /> });
     items.push({ key: "finalLoan", node: <StatBox label="Final Loan Amount" value={`$${fmt(finalLoanAmount)}`} accent /> });
 
-    if (n(appraisedValue) > 0) {
+    // SHOW LTV ONLY IN MANAGER/NORMAL VIEW
+    if (!borrowerView && n(appraisedValue) > 0) {
       items.push({ key: "ltv", node: <StatBox label="LTV" value={`${ltv.toFixed(2)}%`} /> });
     }
 
@@ -329,7 +378,7 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
     try {
       return new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
     } catch {
-      return "September 8, 2025";
+      return "September 26, 2025";
     }
   })();
 
@@ -381,10 +430,18 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
                 </div>
               )}
 
-              {loanType === "FHA" && fhaLtvImpossible && (
+              {/* Updated FHA alerts */}
+              {loanType === "FHA" && fhaCashoutOver80 && (
                 <div className={`rounded-xl border p-3 border-red-500/30 ${lightMode ? "bg-red-50 text-red-700" : "bg-red-500/10 text-red-200"}`}>
-                  <h4 className="font-semibold">FHA LTV exceeds 80%</h4>
-                  <p className="text-xs mt-1">This scenario isn’t possible under FHA guidelines.</p>
+                  <h4 className="font-semibold">FHA Cash-Out over 80% LTV</h4>
+                  <p className="text-xs mt-1">FHA cash-out is not permitted above 80% LTV.</p>
+                </div>
+              )}
+
+              {loanType === "FHA" && !fhaCashoutOver80 && fhaRateTermOver9775 && (
+                <div className={`rounded-xl border p-3 border-red-500/30 ${lightMode ? "bg-red-50 text-red-700" : "bg-red-500/10 text-red-200"}`}>
+                  <h4 className="font-semibold">FHA Rate/Term over 97.75% LTV</h4>
+                  <p className="text-xs mt-1">FHA rate & term is not permitted above 97.75% LTV.</p>
                 </div>
               )}
 
@@ -439,26 +496,60 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
                 onChange={(e) => setCurrentPITI(e.target.value === "" ? "" : Number(e.target.value))} />
             </div>
 
-            {/* previous rate + term-left (YEARS + MONTHS), shown only when Interest Savings is toggled ON */}
+            {/* Previous Interest, Remaining Term, and Planned Time (always show when Interest Savings is ON) */}
             {showInterestSavings && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div className="sm:col-span-1">
                   <label className={textSecondary}>Previous Interest Rate (%)</label>
-                  <input className={inputCls} type="number" step="0.001" value={prevRate}
-                    onChange={(e) => setPrevRate(e.target.value === "" ? "" : Number(e.target.value))} />
+                  <input
+                    className={inputCls}
+                    type="number"
+                    step="0.001"
+                    value={prevRate}
+                    onChange={(e) => setPrevRate(e.target.value === "" ? "" : Number(e.target.value))}
+                  />
+                </div>
+
+                <div>
+                  <label className={textSecondary}>Term Left (Years)</label>
+                  <input
+                    className={inputCls}
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={termLeftYears}
+                    onChange={(e) =>
+                      setTermLeftYears(e.target.value === "" ? "" : Math.max(0, Number(e.target.value)))
+                    }
+                  />
                 </div>
                 <div>
-                  <label className={textSecondary}>Current Loan Term Left (Years)</label>
-                  <input className={inputCls} type="number" min={0} step={1} value={termLeftYears}
-                    onChange={(e) => setTermLeftYears(e.target.value === "" ? "" : Math.max(0, Number(e.target.value)))} />
-                </div>
-                <div>
-                  <label className={textSecondary}>Current Loan Term Left (Months)</label>
-                  <input className={inputCls} type="number" min={0} max={11} step={1} value={termLeftMonths}
+                  <label className={textSecondary}>Term Left (Months)</label>
+                  <input
+                    className={inputCls}
+                    type="number"
+                    min={0}
+                    max={11}
+                    step={1}
+                    value={termLeftMonths}
                     onChange={(e) => {
                       const v = e.target.value === "" ? "" : Math.max(0, Math.min(11, Number(e.target.value)));
                       setTermLeftMonths(v as number | "");
-                    }} />
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className={textSecondary}>Planned Time Left in Home (Years)</label>
+                  <input
+                    className={inputCls}
+                    type="number"
+                    min={0}
+                    step={0.5}
+                    value={plannedYearsInHome}
+                    onChange={(e) =>
+                      setPlannedYearsInHome(e.target.value === "" ? "" : Math.max(0, Number(e.target.value)))
+                    }
+                  />
                 </div>
               </div>
             )}
@@ -501,10 +592,21 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
               </div>
             )}
 
-            <div>
-              <label className={textSecondary}>Monthly Escrow ($)</label>
-              <input className={inputCls} type="number" value={monthlyEscrow}
-                onChange={(e) => setMonthlyEscrow(e.target.value === "" ? "" : Number(e.target.value))} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className={textSecondary}>Monthly Escrow ($)</label>
+                <input className={inputCls} type="number" value={monthlyEscrow}
+                  onChange={(e) => setMonthlyEscrow(e.target.value === "" ? "" : Number(e.target.value))} />
+              </div>
+
+              {loanType === "FHA" && (
+                <div>
+                  <label className={textSecondary}>Current MIP included in Escrow ($/mo)</label>
+                  <input className={inputCls} type="number" value={currentFhaMIPMonthly}
+                    onChange={(e) => setCurrentFhaMIPMonthly(e.target.value === "" ? "" : Number(e.target.value))} />
+                  <p className={`text-xs mt-1 ${lightMode ? "text-black" : "text-white"}`}>We'll subtract this from the escrow input for calculations.</p>
+                </div>
+              )}
             </div>
 
             <div>
@@ -512,6 +614,23 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
               <input className={inputCls} type="number" value={escrowMonths}
                 onChange={(e) => setEscrowMonths(e.target.value === "" ? "" : Number(e.target.value))} />
             </div>
+
+            {/* MI/MIP monthly dollar inputs for NEW loan */}
+            {loanType === "Conventional" && ltv > 80 && (
+              <div>
+                <label className={textSecondary}>Mortgage Insurance ($/mo)</label>
+                <input className={inputCls} type="number" value={convMiMonthlyDollar}
+                  onChange={(e) => setConvMiMonthlyDollar(e.target.value === "" ? "" : Number(e.target.value))} />
+              </div>
+            )}
+
+            {loanType === "FHA" && (
+              <div>
+                <label className={textSecondary}>FHA MIP ($/mo)</label>
+                <input className={inputCls} type="number" value={fhaMipMonthlyDollar}
+                  onChange={(e) => setFhaMipMonthlyDollar(e.target.value === "" ? "" : Number(e.target.value))} />
+              </div>
+            )}
 
             <div>
               <label className={textSecondary}>Underwriting (Bank) ($)</label>
@@ -543,7 +662,7 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
             )}
 
             <div>
-              <label className={textSecondary}>Cost From Lender(%)</label>
+              <label className={textSecondary}>Cost From Lender (%)</label>
               <input className={inputCls} type="number" step="0.01" value={uwmPoints}
                 onChange={(e) => setUwmPoints(e.target.value === "" ? "" : Number(e.target.value))} />
             </div>
@@ -569,6 +688,7 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
               </div>
             </div>
 
+            {/* ===== Rate & Term ROW ===== */}
             <div>
               <label className={textSecondary}>Interest Rate (%)</label>
               <input className={inputCls} type="number" step="0.001" value={interestRate}
@@ -581,21 +701,12 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
                 onChange={(e) => setTermYears(e.target.value === "" ? "" : Number(e.target.value))} />
             </div>
 
-            {loanType === "Conventional" && ltv > 80 && (
-              <div>
-                <label className={textSecondary}>Mortgage Insurance Rate (Annual %)</label>
-                <input className={inputCls} type="number" step="0.001"
-                  value={miAnnualPercent === "" ? "" : miAnnualPercent}
-                  onChange={(e) => setMiAnnualPercent(e.target.value === "" ? "" : Number(e.target.value))} />
-              </div>
-            )}
-
             {loanType === "Conventional" ? (
               <div className="mt-2 space-y-2">
                 <label className={`font-semibold ${textPrimary}`}>Temporary Buydown (Conventional only)</label>
                 <div className="flex items-center gap-8">
                   <div className="flex items-center gap-3">
-                    <label htmlFor="switch-21" className={`text-sm ${twoOneDisabled ? "opacity-50" : textSecondary}`}>2/1 Buydown</label>
+                    <label htmlFor="switch-21" className={`text-sm ${twoOneBuydown || !twoOneDisabled ? textSecondary : "opacity-50"}`}>2/1 Buydown</label>
                     <input
                       id="switch-21"
                       type="checkbox"
@@ -611,7 +722,7 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
                     />
                   </div>
                   <div className="flex items-center gap-3">
-                    <label htmlFor="switch-10" className={`text-sm ${oneZeroDisabled ? "opacity-50" : textSecondary}`}>1/0 Buydown</label>
+                    <label htmlFor="switch-10" className={`text-sm ${oneZeroBuydown || !oneZeroDisabled ? textSecondary : "opacity-50"}`}>1/0 Buydown</label>
                     <input
                       id="switch-10"
                       type="checkbox"
@@ -685,6 +796,14 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
                   <div key={it.key}>{it.node}</div>
                 ))}
               </div>
+
+              {/* NEW FHA/VA disclaimer under Final Loan Amount */}
+              {(loanType === "FHA" || loanType === "VA" || loanType === "VA IRRRL") && (
+                <p className={`text-xs mt-2 ${textSecondary}`}>
+                  <em>Disclaimer:</em> For FHA/VA scenarios, make sure that <strong>UFMIP/Funding Fee is not financed in UWM</strong>.
+                </p>
+              )}
+
               {showTempBuydown && (
                 <p className={`text-xs ${textSecondary}`}>Year 1 diff: ${fmt(diffY1)}{twoOneBuydown ? ` • Year 2 diff: $${fmt(diffY2)}` : ""}</p>
               )}
@@ -694,9 +813,9 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
               <SectionTitle>Monthly PITI Breakdown</SectionTitle>
               <div className="grid grid-cols-2 gap-3">
                 <StatBox label="Principal & Interest" value={`$${fmt(PI)}`} />
-                <StatBox label="Escrow" value={`$${fmt(n(monthlyEscrow))}`} />
-                {loanType === "FHA" && <StatBox label="MIP" value={`$${fmt(mipMonthly)}`} />}
-                {loanType === "Conventional" && ltv > 80 && <StatBox label="Mortgage Insurance" value={`$${fmt(miMonthly)}`} />}
+                <StatBox label="Escrow" value={`$${fmt(effectiveMonthlyEscrow)}`} />
+                {loanType === "FHA" && <StatBox label="MIP (new loan)" value={`$${fmt(mipMonthly)}`} />}
+                {loanType === "Conventional" && ltv > 80 && <StatBox label="Mortgage Insurance (new loan)" value={`$${fmt(miMonthly)}`} />}
                 {/* ACCENT bubble for Total Monthly Payment */}
                 <StatBox label="Total Monthly Payment (New PITI)" value={`$${fmt(basePITI)}`} accent />
               </div>
@@ -730,10 +849,21 @@ export default function MortgageCalculatorMismo_vNext_InterestToggle_YrsMonths()
             {borrowerView && showInterestSavings && (
               <div className="space-y-3">
                 <SectionTitle>Interest Savings</SectionTitle>
-                <p className={`text-xs ${textSecondary}`}>Compares total interest on the remaining term of the current loan (at the previous rate) vs the total interest on the new loan. "True" savings subtract all new-loan costs.</p>
+                <p className={`text-xs ${textSecondary}`}>
+                  {plannedMonths > 0
+                    ? <>Calculated over your planned time before moving.</>
+                    : <>Calculated over the full remaining term (current) vs full term (new).</>}
+                  {" "} "True" savings subtract all new-loan costs.
+                </p>
                 <div className="grid grid-cols-2 gap-3">
-                  <StatBox label="Current Interest Due" value={`$${fmt(currentInterestDue)}`} />
-                  <StatBox label="New Interest Due" value={`$${fmt(newInterestDue)}`} />
+                  <StatBox
+                    label={`Current Interest Due${plannedMonths > 0 ? ` (in ${Math.round(plannedMonths/12 * 100) / 100} yrs)` : ""}`}
+                    value={`$${fmt(currentInterestDue)}`}
+                  />
+                  <StatBox
+                    label={`New Interest Due${plannedMonths > 0 ? ` (in ${Math.round(plannedMonths/12 * 100) / 100} yrs)` : ""}`}
+                    value={`$${fmt(newInterestDue)}`}
+                  />
                   <StatBox label="Interest Savings" value={`$${fmt(interestSavings)}`} />
                   {/* ACCENT bubble for True Interest Savings */}
                   <StatBox label="True Interest Savings after Cost" value={`$${fmt(trueSavingsAfterCost)}`} accent />
