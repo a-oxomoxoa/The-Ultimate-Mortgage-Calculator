@@ -1,3 +1,4 @@
+
 /* eslint-disable react/no-unescaped-entities */
 "use client";
 
@@ -91,6 +92,14 @@ export default function MortgageCalculatorMismo_vNext() {
   };
   const accentBg = (alpha = 0.1) => ({ backgroundColor: hexToRgba(accentColor, alpha), borderColor: hexToRgba(accentColor, 0.35) });
   const accentText = { color: accentColor } as const;
+
+  // Interest rate helpers
+  const trimRate = (r: number) => {
+    const s = r.toFixed(3);
+    return s.replace(/0+$/, "").replace(/\.$/, "");
+  };
+  const roundDownToEighth = (r: number) => Math.floor(r / 0.125) * 0.125;
+  const roundUpToEighth = (r: number) => Math.ceil(r / 0.125) * 0.125;
 
   // ===== Effects =====
   useEffect(() => {
@@ -204,6 +213,9 @@ export default function MortgageCalculatorMismo_vNext() {
   const ltv = n(appraisedValue) > 0 ? (finalLoanAmount / n(appraisedValue)) * 100 : 0;
   const miMonthly = loanType === "Conventional" && ltv > 80 ? n(convMiMonthlyDollar) : 0;
   const basePITI = PI + effectiveMonthlyEscrow + mipMonthly + miMonthly;
+  // Rounded versions for borrower view display
+  const PI_rounded10 = Math.round(PI / 10) * 10;
+  const basePITI_rounded10 = Math.round(basePITI / 10) * 10;
 
   // Debt consolidation
   const isConsolidating = effectiveCashOut > 0 && (n(debtPaid) > 0 || n(debtMonthly) > 0);
@@ -380,6 +392,16 @@ export default function MortgageCalculatorMismo_vNext() {
     } catch {
       return "September 26, 2025";
     }
+  })();
+
+  // ===== Interest Rate display strings =====
+  const interestRateExactLabel = interestRate === "" ? "—" : `${trimRate(n(interestRate))}%`;
+  const interestRateRangeLabel = (() => {
+    const r = n(interestRate);
+    if (r <= 0) return "—";
+    const lo = roundDownToEighth(r);
+    const hi = roundUpToEighth(r + 0.125);
+    return `${trimRate(lo)}%–${trimRate(hi)}%`;
   })();
 
   return (
@@ -759,18 +781,30 @@ export default function MortgageCalculatorMismo_vNext() {
 
           {/* ===== Right: Results ===== */}
           <section className={`${panelCls} flex flex-col gap-5 relative`}>
-            {/* Loan type chip */}
+            {/* Loan type chip (rate removed from here) */}
             <div className={`rounded-2xl border p-3 ${lightMode ? "bg-white border-slate-300" : ""}`} style={{ ...accentBg(0.08) }}>
               <div className={`text-xs uppercase tracking-wide`} style={accentText}>Loan Type</div>
               <div className={`text-lg font-semibold ${textPrimary}`}>
                 {(() => {
-                  const rateLabel = interestRate === "" ? "" : ` — ${Number(interestRate).toFixed(3).replace(/0+$/, '').replace(/\.$/, '')}%`;
                   const termLabel = `${n(termYears)} year`;
-                  if ((loanType === "FHA" || loanType === "VA" || loanType === "VA IRRRL") && armType !== "None") return `${loanType} ${armType} ARM — ${termLabel}${rateLabel}`;
+                  if ((loanType === "FHA" || loanType === "VA" || loanType === "VA IRRRL") && armType !== "None") return `${loanType} ${armType} ARM — ${termLabel}`;
                   const prefix = loanType === "Conventional" ? "Conventional" : loanType;
-                  return `${prefix} Fixed — ${termLabel}${rateLabel}`;
+                  return `${prefix} Fixed — ${termLabel}`;
                 })()}
               </div>
+            </div>
+
+            {/* NEW: Interest Rate chip */}
+            <div className={`rounded-2xl border p-3 ${lightMode ? "bg-white border-slate-300" : "bg-slate-950 border-slate-800"}`}>
+              <div className={`text-xs uppercase tracking-wide`} style={accentText}>
+                {borrowerView ? "Estimated Interest Rate" : "Interest Rate"}
+              </div>
+              <div className={`text-lg font-semibold ${textPrimary}`}>
+                {borrowerView ? interestRateRangeLabel : interestRateExactLabel}
+              </div>
+              {borrowerView && (
+                <p className={`text-xs mt-1 ${textSecondary}`}>Range shown for illustration only. Final rate depends on underwriting and market conditions.</p>
+              )}
             </div>
 
             {(borrowerName || goal) && (
@@ -790,7 +824,7 @@ export default function MortgageCalculatorMismo_vNext() {
             )}
 
             <div className="space-y-3">
-              <SectionTitle>Loan & Cost Breakdown</SectionTitle>
+              <SectionTitle>{borrowerView ? "Estimated Loan and Cost Breakdown" : "Loan & Cost Breakdown"}</SectionTitle>
               <div className="grid grid-cols-2 gap-3">
                 {loanCostItemsVisible.map((it) => (
                   <div key={it.key}>{it.node}</div>
@@ -812,12 +846,12 @@ export default function MortgageCalculatorMismo_vNext() {
             <div className="space-y-3">
               <SectionTitle>Monthly PITI Breakdown</SectionTitle>
               <div className="grid grid-cols-2 gap-3">
-                <StatBox label="Principal & Interest" value={`$${fmt(PI)}`} />
+                <StatBox label={borrowerView ? "Estimated Principal & Interest" : "Principal & Interest"} value={`$${fmt(borrowerView ? PI_rounded10 : PI)}`} />
                 <StatBox label="Escrow" value={`$${fmt(effectiveMonthlyEscrow)}`} />
                 {loanType === "FHA" && <StatBox label="MIP (new loan)" value={`$${fmt(mipMonthly)}`} />}
                 {loanType === "Conventional" && ltv > 80 && <StatBox label="Mortgage Insurance (new loan)" value={`$${fmt(miMonthly)}`} />}
-                {/* ACCENT bubble for Total Monthly Payment */}
-                <StatBox label="Total Monthly Payment (New PITI)" value={`$${fmt(basePITI)}`} accent />
+                {/* ACCENT bubble for Total Monthly Payment (rename in Borrower View) */}
+                <StatBox label={borrowerView ? "Total Estimated Monthly Payment" : "Total Monthly Payment (New PITI)"} value={`$${fmt(borrowerView ? basePITI_rounded10 : basePITI)}`} accent />
               </div>
             </div>
 
@@ -845,10 +879,10 @@ export default function MortgageCalculatorMismo_vNext() {
               )}
             </div>
 
-            {/* Interest Savings — borrower view only AND toggle-controlled */}
+            {/* Estimated Interest Savings — borrower view only AND toggle-controlled */}
             {borrowerView && showInterestSavings && (
               <div className="space-y-3">
-                <SectionTitle>Interest Savings</SectionTitle>
+                <SectionTitle>Estimated Interest Savings</SectionTitle>
                 <p className={`text-xs ${textSecondary}`}>
                   {plannedMonths > 0
                     ? <>Calculated over your planned time before moving.</>
@@ -864,9 +898,9 @@ export default function MortgageCalculatorMismo_vNext() {
                     label={`New Interest Due${plannedMonths > 0 ? ` (in ${Math.round(plannedMonths/12 * 100) / 100} yrs)` : ""}`}
                     value={`$${fmt(newInterestDue)}`}
                   />
-                  <StatBox label="Interest Savings" value={`$${fmt(interestSavings)}`} />
-                  {/* ACCENT bubble for True Interest Savings */}
-                  <StatBox label="True Interest Savings after Cost" value={`$${fmt(trueSavingsAfterCost)}`} accent />
+                  <StatBox label="Estimated Interest Savings" value={`$${fmt(interestSavings)}`} />
+                  {/* ACCENT bubble for True Estimated Interest Savings */}
+                  <StatBox label="True Estimated Interest Savings after Cost" value={`$${fmt(trueSavingsAfterCost)}`} accent />
                 </div>
               </div>
             )}
